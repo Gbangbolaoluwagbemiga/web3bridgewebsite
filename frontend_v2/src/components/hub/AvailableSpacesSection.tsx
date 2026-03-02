@@ -23,8 +23,8 @@ export default function AvailableSpacesSection() {
     const fetchSpaces = async () => {
       try {
         const [spacesRes, statsRes] = await Promise.all([
-          fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/v2/hub/space/all/`),
-          fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/v2/hub/space/stats/`),
+          fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/hub/space/all/`),
+          fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/hub/space/stats/`),
         ]);
 
         const spacesData = await spacesRes.json();
@@ -155,7 +155,7 @@ export default function AvailableSpacesSection() {
               >
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-xl font-semibold text-foreground">
-                    {space.name}
+                    {space.name.slice(0, 1).toUpperCase() + space.name.slice(1)}
                   </h3>
                   {space.is_active ? (
                     <span className="px-3 py-1 rounded-full bg-green-500/20 text-green-600 dark:text-green-400 text-xs font-medium">
@@ -194,7 +194,7 @@ export default function AvailableSpacesSection() {
                         {Math.round(space.occupancy_percentage)}%
                       </span>
                     </div>
-                    <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
+                    <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
                       <motion.div
                         initial={{ width: 0 }}
                         whileInView={{ width: `${space.occupancy_percentage}%` }}
