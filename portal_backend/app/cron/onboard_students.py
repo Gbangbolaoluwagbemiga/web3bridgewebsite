@@ -69,9 +69,7 @@ async def _get_last_successful_cursor(session: AsyncSession) -> str | None:
     return record.cursor if record else None
 
 
-async def _fetch_paid_non_zk_students(
-    session: AsyncSession, *, cursor: str | None
-) -> list[dict]:
+async def _fetch_paid_non_zk_students(session: AsyncSession, *, cursor: str | None) -> list[dict]:
     """Query backend_v2 cohort_participant for paid, accepted students."""
     base_query = """
         SELECT
@@ -137,23 +135,17 @@ async def _onboard_student(
 
     # Check if already mapped
     result = await session.execute(
-        select(ExternalStudentMap).where(
-            ExternalStudentMap.external_student_id == external_id
-        )
+        select(ExternalStudentMap).where(ExternalStudentMap.external_student_id == external_id)
     )
     external_map = result.scalar_one_or_none()
 
     # Resolve existing user
     user = None
     if external_map is not None:
-        result = await session.execute(
-            select(User).where(User.id == external_map.user_id)
-        )
+        result = await session.execute(select(User).where(User.id == external_map.user_id))
         user = result.scalar_one_or_none()
     if user is None:
-        result = await session.execute(
-            select(User).where(User.email == email)
-        )
+        result = await session.execute(select(User).where(User.email == email))
         user = result.scalar_one_or_none()
 
     created = False
@@ -178,9 +170,7 @@ async def _onboard_student(
         )
 
     # Upsert profile
-    result = await session.execute(
-        select(StudentProfile).where(StudentProfile.user_id == user.id)
-    )
+    result = await session.execute(select(StudentProfile).where(StudentProfile.user_id == user.id))
     profile = result.scalar_one_or_none()
 
     if profile is None:
@@ -230,9 +220,7 @@ async def _onboard_student(
 
     # Send activation email only for newly created users
     if created:
-        token, token_jti, expires_at = create_activation_token(
-            user_id=user.id, email=user.email
-        )
+        token, token_jti, expires_at = create_activation_token(user_id=user.id, email=user.email)
         user.activation_token_jti = token_jti
         user.activation_token_expires_at = expires_at
 
@@ -362,7 +350,9 @@ async def run_onboard_cron() -> dict:
 
 
 def main() -> None:
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+    logging.basicConfig(
+        level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s"
+    )
     result = asyncio.run(run_onboard_cron())
     print(f"Done: {result}")
 
