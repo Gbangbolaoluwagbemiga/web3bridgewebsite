@@ -37,6 +37,7 @@ def build_user() -> User:
         email="student@example.com",
         role="student",
         account_state=AccountState.ACTIVE.value,
+        email_verified=True,
     )
 
 

@@ -1,21 +1,26 @@
-from django.forms import ValidationError
+import json
+import logging
+import threading
+
+from django.conf import settings
 from django.core.cache import cache
 from django.db.models import Q
-from rest_framework.response import Response
-from rest_framework.renderers import JSONRenderer
-from payment.models import DiscountCode, Payment
-from rest_framework import decorators, pagination, status, viewsets
-from . import serializers, models
-from utils.helpers.requests import Utils as requestUtils
+from django.forms import ValidationError
 from decouple import config
-import threading
-import json
 from drf_yasg.utils import swagger_auto_schema
-from .helpers.model import send_registration_success_mail, send_participant_details, send_approval_email
+from rest_framework import decorators, pagination, status, viewsets
+from rest_framework.renderers import JSONRenderer
+from rest_framework.response import Response
+
+from . import models, serializers
+from .helpers.model import send_approval_email, send_participant_details, send_registration_success_mail
 from backend_v2.scripts.mail import send_bulk_email
-from utils.helpers.mixins import GuestReadAllWriteAdminOnlyPermissionMixin 
+from payment.models import DiscountCode, Payment
 from utils.enums.models import RegistrationStatus
-from django.conf import settings
+from utils.helpers.mixins import GuestReadAllWriteAdminOnlyPermissionMixin
+from utils.helpers.requests import Utils as requestUtils
+
+logger = logging.getLogger(__name__)
 
 def invalidate_participant_cache():
     """Helper function to invalidate participant cache"""
@@ -34,7 +39,17 @@ def invalidate_participant_cache():
 
 API_KEY = config("PAYMENT_API_KEY")
 
-class CouresViewSet(GuestReadAllWriteAdminOnlyPermissionMixin, viewsets.ViewSet):
+
+def handle_payment_success(participant_object, serialized_participant_obj, serializer_class):
+    email = serialized_participant_obj.get('email')
+    participant_name = serialized_participant_obj.get('name')
+    course_id = serialized_participant_obj.get('course').get('id')
+
+    send_registration_success_mail(email, course_id, participant_name)
+    send_participant_details(email, course_id, serialized_participant_obj)
+    return serializer_class.Retrieve(participant_object).data
+
+class CoursesViewSet(GuestReadAllWriteAdminOnlyPermissionMixin, viewsets.ViewSet):
     queryset= models.Course.objects
     serializer_class= serializers.CourseSerializer
     admin_actions= ["create", "update", "destroy", "open_course", "close_course"]
@@ -293,14 +308,11 @@ class ParticipantViewSet(GuestReadAllWriteAdminOnlyPermissionMixin, viewsets.Vie
                 participant_obj.payment_status = True
                 participant_obj.save()
                 serialized_participant_obj = self.serializer_class.Retrieve(participant_obj).data
-
-                # Send registration success email
-                email = serialized_participant_obj.get('email')
-                participant_name = serialized_participant_obj.get('name')
-                course_id = serialized_participant_obj.get('course').get('id')
-
-                send_registration_success_mail(email, course_id, participant_name)
-                send_participant_details(email, course_id, serialized_participant_obj)
+                serialized_participant_obj = handle_payment_success(
+                    participant_obj,
+                    serialized_participant_obj,
+                    self.serializer_class,
+                )
 
             # Return success response
             return requestUtils.success_response(
@@ -360,14 +372,11 @@ class ParticipantViewSet(GuestReadAllWriteAdminOnlyPermissionMixin, viewsets.Vie
         # Invalidate cache when payment status changes
         invalidate_participant_cache()
 
-        # Send registration success email
-        email = serialized_participant_obj.get('email')
-        participant_name = serialized_participant_obj.get('name')
-        course_id = serialized_participant_obj.get('course').get('id')
-
-        send_registration_success_mail(email, course_id, participant_name)
-        send_participant_details(email, course_id, serialized_participant_obj)
-        serialized_participant_obj = self.serializer_class.Retrieve(participant_object).data
+        serialized_participant_obj = handle_payment_success(
+            participant_object,
+            serialized_participant_obj,
+            self.serializer_class,
+        )
         return requestUtils.success_response(data=serialized_participant_obj, http_status=status.HTTP_200_OK)
         
     @swagger_auto_schema(request_body=serializers.EmailSerializer)
@@ -414,28 +423,22 @@ class ParticipantViewSet(GuestReadAllWriteAdminOnlyPermissionMixin, viewsets.Vie
     @swagger_auto_schema(request_body=serializers.EmailSerializer)
     @decorators.action(detail=False, methods=["post"], url_path="send-confirmation-email")
     def send_confirmation_email(self, request, *args, **kwargs):
+        """Resend registration confirmation emails. Does NOT change payment status."""
         email = request.data.get("email")
         if not email:
             return requestUtils.error_response("Email is required", {}, http_status=status.HTTP_400_BAD_REQUEST)
-        
+
         participant_object = self.get_queryset().filter(email=email).first()
         if not participant_object:
             return requestUtils.error_response("Participant not found", {}, http_status=status.HTTP_404_NOT_FOUND)
-        
-        serialized_participant_obj = self.serializer_class.Retrieve(participant_object).data
-        participant_object.payment_status = True
-        participant_object.save()
-        # Invalidate cache when payment status changes
-        invalidate_participant_cache()
 
-        # Send registration success email
-        email = serialized_participant_obj.get('email')
+        serialized_participant_obj = self.serializer_class.Retrieve(participant_object).data
+        course_id = serialized_participant_obj.get('course', {}).get('id')
         participant_name = serialized_participant_obj.get('name')
-        course_id = serialized_participant_obj.get('course').get('id')
 
         send_registration_success_mail(email, course_id, participant_name)
         send_participant_details(email, course_id, serialized_participant_obj)
-        serialized_participant_obj = self.serializer_class.Retrieve(participant_object).data
+
         return requestUtils.success_response(data=serialized_participant_obj, http_status=status.HTTP_200_OK)
 
     @decorators.action(detail=True, methods=["post"], url_path="approve")
@@ -702,20 +705,15 @@ class BulkEmailViewSet(GuestReadAllWriteAdminOnlyPermissionMixin, viewsets.ViewS
             if not recipient_ids:
                 return Response({"message": "No recipients provided"}, status=status.HTTP_400_BAD_REQUEST)
             
-            # Send email asynchronously in background to avoid timeout
-            print(f"[API] Bulk email request received")
-            print(f"[API] Subject: {subject}")
-            print(f"[API] Recipient IDs: {recipient_ids}")
-            print(f"[API] From admission: {from_admission}")
-            print(f"[API] Starting background thread...")
-            
+            logger.info("Bulk email request: subject=%s, recipients=%d, from_admission=%s",
+                        subject, len(recipient_ids), from_admission)
+
             thread = threading.Thread(
                 target=send_bulk_email,
                 args=(subject, html_body, recipient_ids, from_admission),
                 daemon=True
             )
             thread.start()
-            print(f"[API] Background thread started, returning 200 response")
             
             # Return immediately
             return Response({
@@ -737,19 +735,14 @@ class BulkEmailViewSet(GuestReadAllWriteAdminOnlyPermissionMixin, viewsets.ViewS
             if not recipient_ids:
                 return Response({"message": "No recipients provided"}, status=status.HTTP_400_BAD_REQUEST)
             
-            # Send email asynchronously in background to avoid timeout
-            print(f"[API] Admission bulk email request received")
-            print(f"[API] Subject: {subject}")
-            print(f"[API] Recipient IDs: {recipient_ids}")
-            print(f"[API] Starting background thread for admission emails...")
-            
+            logger.info("Admission bulk email request: subject=%s, recipients=%d", subject, len(recipient_ids))
+
             thread = threading.Thread(
                 target=send_bulk_email,
                 args=(subject, html_body, recipient_ids, True),
                 daemon=True
             )
             thread.start()
-            print(f"[API] Background thread started, returning 200 response")
             
             # Return immediately
             return Response({

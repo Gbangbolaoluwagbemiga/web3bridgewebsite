@@ -277,6 +277,7 @@ async def test_step5_get_profile():
         email="teststudent@example.com",
         role=UserRole.STUDENT.value,
         account_state=AccountState.ACTIVE.value,
+        email_verified=True,
     )
     profile = StudentProfile(
         user_id=42,
@@ -309,6 +310,7 @@ async def test_step5_update_profile():
         email="teststudent@example.com",
         role=UserRole.STUDENT.value,
         account_state=AccountState.ACTIVE.value,
+        email_verified=True,
     )
     profile = StudentProfile(
         user_id=42,

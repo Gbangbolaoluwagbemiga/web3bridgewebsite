@@ -39,11 +39,32 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
 
 
+class VerifyEmailRequest(BaseModel):
+    code: str = Field(min_length=6, max_length=6)
+
+
+class ResendVerificationRequest(BaseModel):
+    pass
+
+
+class VerifyEmailResponse(BaseModel):
+    detail: str
+    email_verified: bool
+
+
 class AuthUserResponse(BaseModel):
     id: int
     email: EmailStr
     role: str
     account_state: str
+    email_verified: bool = False
+    full_name: str | None = None
+    phone: str | None = None
+    discord_id: str | None = None
+    wallet_address: str | None = None
+    cohort: str | None = None
+    onboarding_status: str | None = None
+    bio: str | None = None
 
 
 class AuthResponse(BaseModel):

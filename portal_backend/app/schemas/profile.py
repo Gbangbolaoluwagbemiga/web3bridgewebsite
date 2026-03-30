@@ -6,6 +6,7 @@ class MyProfileResponse(BaseModel):
     email: str
     role: str
     account_state: str
+    email_verified: bool = False
     full_name: str
     phone: str | None = None
     discord_id: str | None = None

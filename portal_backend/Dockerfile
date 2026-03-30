@@ -13,4 +13,4 @@ RUN pip install --no-cache-dir -r requirements.txt psycopg2-binary
 COPY . .
 
 # Run migrations then start server
-CMD alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8100
+CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8100}"]

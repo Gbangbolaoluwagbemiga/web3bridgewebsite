@@ -12,28 +12,35 @@ https://docs.djangoproject.com/en/5.0/ref/settings/
 
 import os
 from pathlib import Path
-from decouple import config
-from .literals import (API_VERSION, ENVIROMENT)
+from decouple import Csv, config
+from .literals import API_VERSION, ENVIROMENT
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
-API_VERSION = config('API_VERSION', default=API_VERSION)
-ENVIROMENT = config('ENVIROMENT', default=ENVIROMENT)
+API_VERSION = config("API_VERSION", default=API_VERSION)
+ENVIROMENT = config("ENVIROMENT", default=ENVIROMENT)
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = config('SECRET_KEY')
+SECRET_KEY = config("SECRET_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = config('DEBUG', default=True, cast=bool)
+DEBUG = config("DEBUG", default=True, cast=bool)
 
-ALLOWED_HOSTS = ['*']
-# CORS_ALLOWED_ORIGINS = [
-    # "http://*",
-    # "https://*",
-# ]
-
-CORS_ALLOW_ALL_ORIGINS = True
+ALLOWED_HOSTS = config("ALLOWED_HOSTS", default="localhost,127.0.0.1", cast=Csv())
+CORS_ALLOW_ALL_ORIGINS = config("CORS_ALLOW_ALL_ORIGINS", default=DEBUG, cast=bool)
+CORS_ALLOWED_ORIGINS = config("CORS_ALLOWED_ORIGINS", default="", cast=Csv())
 CORS_ALLOW_CREDENTIALS = True
+
+if ENVIROMENT == "production":
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    SECURE_SSL_REDIRECT = config("SECURE_SSL_REDIRECT", default=True, cast=bool)
+    SESSION_COOKIE_SECURE = config("SESSION_COOKIE_SECURE", default=True, cast=bool)
+    CSRF_COOKIE_SECURE = config("CSRF_COOKIE_SECURE", default=True, cast=bool)
+    SECURE_HSTS_SECONDS = config("SECURE_HSTS_SECONDS", default=31536000, cast=int)
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = config(
+        "SECURE_HSTS_INCLUDE_SUBDOMAINS", default=True, cast=bool
+    )
+    SECURE_HSTS_PRELOAD = config("SECURE_HSTS_PRELOAD", default=True, cast=bool)
 
 # AUTHENTICATION_BACKENDS = [
 #     "utils.authentication.backends.JWTAuthenticationByAuthServer",
@@ -42,19 +49,19 @@ CORS_ALLOW_CREDENTIALS = True
 # Application definition
 
 INSTALLED_APPS = [
-    'django.contrib.admin',
-    'django.contrib.auth',
-    'django.contrib.contenttypes',
-    'django.contrib.sessions',
-    'django.contrib.messages',
-    'django.contrib.staticfiles',
-    'corsheaders',
-    'rest_framework',
+    "django.contrib.admin",
+    "django.contrib.auth",
+    "django.contrib.contenttypes",
+    "django.contrib.sessions",
+    "django.contrib.messages",
+    "django.contrib.staticfiles",
+    "corsheaders",
+    "rest_framework",
     "rest_framework_simplejwt",
-    'cloudinary',
-    'cloudinary_storage',
+    "cloudinary",
+    "cloudinary_storage",
     "drf_yasg",
-    'django_redis',
+    "django_redis",
 ]
 
 PROJECT_APPS = [
@@ -64,54 +71,54 @@ PROJECT_APPS = [
     "apps.dapp",
     "apps.operation",
     "apps.payment",
-    "apps.hub"
+    "apps.hub",
 ]
 
 INSTALLED_APPS += PROJECT_APPS
 
 MIDDLEWARE = [
-    'corsheaders.middleware.CorsMiddleware',
-    'django.middleware.security.SecurityMiddleware',
-    'django.contrib.sessions.middleware.SessionMiddleware',
-    'django.middleware.common.CommonMiddleware',
-    'django.middleware.csrf.CsrfViewMiddleware',
-    'django.contrib.auth.middleware.AuthenticationMiddleware',
-    'django.contrib.messages.middleware.MessageMiddleware',
-    'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'utils.middlewares.ErrorMiddleware',
+    "corsheaders.middleware.CorsMiddleware",
+    "django.middleware.security.SecurityMiddleware",
+    "django.contrib.sessions.middleware.SessionMiddleware",
+    "django.middleware.common.CommonMiddleware",
+    "django.middleware.csrf.CsrfViewMiddleware",
+    "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "django.contrib.messages.middleware.MessageMiddleware",
+    "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "utils.middlewares.ErrorMiddleware",
 ]
 
-ROOT_URLCONF = 'backend_v2.urls'
+ROOT_URLCONF = "backend_v2.urls"
 
 
 TEMPLATES = [
     {
-        'BACKEND': 'django.template.backends.django.DjangoTemplates',
+        "BACKEND": "django.template.backends.django.DjangoTemplates",
         "DIRS": [
-            BASE_DIR / 'templates'  # Here
+            BASE_DIR / "templates"  # Here
         ],
-        'APP_DIRS': True,
-        'OPTIONS': {
-            'context_processors': [
-                'django.template.context_processors.debug',
-                'django.template.context_processors.request',
-                'django.contrib.auth.context_processors.auth',
-                'django.contrib.messages.context_processors.messages',
+        "APP_DIRS": True,
+        "OPTIONS": {
+            "context_processors": [
+                "django.template.context_processors.debug",
+                "django.template.context_processors.request",
+                "django.contrib.auth.context_processors.auth",
+                "django.contrib.messages.context_processors.messages",
             ],
         },
     },
 ]
 
-WSGI_APPLICATION = 'backend_v2.wsgi.application'
+WSGI_APPLICATION = "backend_v2.wsgi.application"
 
 
 # Database
 # https://docs.djangoproject.com/en/5.0/ref/settings/#databases
 
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+    "default": {
+        "ENGINE": "django.db.backends.sqlite3",
+        "NAME": BASE_DIR / "db.sqlite3",
     },
     "production": {
         "ENGINE": "django.db.backends.postgresql",
@@ -120,41 +127,41 @@ DATABASES = {
         "PASSWORD": config("DB_PASSWORD"),
         "HOST": config("DB_HOST"),
         "PORT": config("DB_PORT", default="5432"),
-    }
+    },
 }
 
 # Determine the database configuration based on environment
-if ENVIROMENT == 'production':
-    DATABASES['default'] = DATABASES['production']
+if ENVIROMENT == "production":
+    DATABASES["default"] = DATABASES["production"]
 
 # Password validation
 # https://docs.djangoproject.com/en/5.0/ref/settings/#auth-password-validators
 
 AUTH_PASSWORD_VALIDATORS = [
     {
-        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
+        "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
     },
     {
-        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
+        "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
     },
     {
-        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
+        "NAME": "django.contrib.auth.password_validation.CommonPasswordValidator",
     },
     {
-        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
+        "NAME": "django.contrib.auth.password_validation.NumericPasswordValidator",
     },
 ]
 
-AUTH_SERVER_URL = 'https://overall-ofella-web3bridge-270edff0.koyeb.app'
+AUTH_SERVER_URL = "https://overall-ofella-web3bridge-270edff0.koyeb.app"
 
 # Internationalization
 # https://docs.djangoproject.com/en/5.0/topics/i18n/
 
-LANGUAGE_CODE = 'en-us'
+LANGUAGE_CODE = "en-us"
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = "UTC"
 
-DATE_INPUT_FORMATS = ('%y-%m-%d', '%y/%m/%d')
+DATE_INPUT_FORMATS = ("%y-%m-%d", "%y/%m/%d")
 
 USE_I18N = True
 
@@ -164,48 +171,46 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.0/howto/static-files/
 
-STATIC_URL = '/staticfiles/'
-STATIC_ROOT = BASE_DIR / 'staticfiles'
+STATIC_URL = "/staticfiles/"
+STATIC_ROOT = BASE_DIR / "staticfiles"
 
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.0/ref/settings/#default-auto-field
 
-DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 
 # _______________________DRF_________________________
-DEFAULT_RENDERER_CLASSES = (
-    'rest_framework.renderers.JSONRenderer',
-)
+DEFAULT_RENDERER_CLASSES = ("rest_framework.renderers.JSONRenderer",)
 
 if DEBUG:
     DEFAULT_RENDERER_CLASSES = DEFAULT_RENDERER_CLASSES + (
-        'rest_framework.renderers.BrowsableAPIRenderer',
+        "rest_framework.renderers.BrowsableAPIRenderer",
     )
 
 REST_FRAMEWORK = {
-    'DEFAULT_AUTHENTICATION_CLASSES': (),
-    'DEFAULT_PERMISSION_CLASSES': (
-        'rest_framework.permissions.AllowAny',),
-    'DEFAULT_RENDERER_CLASSES': DEFAULT_RENDERER_CLASSES,
-    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.LimitOffsetPagination',
-    'PAGE_SIZE': 13,
-    'DEFAULT_FILTER_BACKENDS': ('rest_framework.filters.SearchFilter',
-                                'rest_framework.filters.OrderingFilter'),
-    'SEARCH_PARAM': 'q',
-    'ORDERING_PARAM': 'ordering',
-
+    "DEFAULT_AUTHENTICATION_CLASSES": (),
+    "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.AllowAny",),
+    "DEFAULT_RENDERER_CLASSES": DEFAULT_RENDERER_CLASSES,
+    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.LimitOffsetPagination",
+    "PAGE_SIZE": 13,
+    "DEFAULT_FILTER_BACKENDS": (
+        "rest_framework.filters.SearchFilter",
+        "rest_framework.filters.OrderingFilter",
+    ),
+    "SEARCH_PARAM": "q",
+    "ORDERING_PARAM": "ordering",
 }
 
 # ______________________cloudinary______________________
 CLOUDINARY_STORAGE = {
-    'CLOUD_NAME': config('cloudinary_cloud_name'),
-    'API_KEY': config('cloudinary_api_key'),
-    'API_SECRET': config('cloudinary_api_secret')
+    "CLOUD_NAME": config("cloudinary_cloud_name"),
+    "API_KEY": config("cloudinary_api_key"),
+    "API_SECRET": config("cloudinary_api_secret"),
 }
 
-DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
+DEFAULT_FILE_STORAGE = "cloudinary_storage.storage.MediaCloudinaryStorage"
 
 # _______________________Swagger_________________________
 SWAGGER_SETTINGS = {
@@ -217,60 +222,87 @@ SWAGGER_SETTINGS = {
 
 """""email settings"""
 
-EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = config('EMAIL_HOST')
-EMAIL_PORT = config('EMAIL_PORT', cast=int)
-EMAIL_HOST_USER = config('EMAIL_HOST_USER')
-EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD')
-EMAIL_USE_TLS = config('EMAIL_USE_TLS', default=True, cast=bool)
-DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL')
+EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+EMAIL_HOST = config("EMAIL_HOST")
+EMAIL_PORT = config("EMAIL_PORT", cast=int)
+EMAIL_HOST_USER = config("EMAIL_HOST_USER")
+EMAIL_HOST_PASSWORD = config("EMAIL_HOST_PASSWORD")
+EMAIL_USE_TLS = config("EMAIL_USE_TLS", default=True, cast=bool)
+DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL")
 
 # Admission email settings (optional - will fall back to main email settings if not set)
-ADMISSION_EMAIL_HOST = config('ADMISSION_EMAIL_HOST', default=EMAIL_HOST)
-ADMISSION_EMAIL_PORT = config('ADMISSION_EMAIL_PORT', default=EMAIL_PORT, cast=int)
-ADMISSION_EMAIL_HOST_USER = config('ADMISSION_EMAIL_HOST_USER', default=None)
-ADMISSION_EMAIL_HOST_PASSWORD = config('ADMISSION_EMAIL_HOST_PASSWORD', default=None)
-ADMISSION_EMAIL_USE_TLS = config('ADMISSION_EMAIL_USE_TLS', default=EMAIL_USE_TLS, cast=bool)
+ADMISSION_EMAIL_HOST = config("ADMISSION_EMAIL_HOST", default=EMAIL_HOST)
+ADMISSION_EMAIL_PORT = config("ADMISSION_EMAIL_PORT", default=EMAIL_PORT, cast=int)
+ADMISSION_EMAIL_HOST_USER = config("ADMISSION_EMAIL_HOST_USER", default=None)
+ADMISSION_EMAIL_HOST_PASSWORD = config("ADMISSION_EMAIL_HOST_PASSWORD", default=None)
+ADMISSION_EMAIL_USE_TLS = config(
+    "ADMISSION_EMAIL_USE_TLS", default=EMAIL_USE_TLS, cast=bool
+)
 
 # _______________________Scholarship Email Script Settings_________________________
 # Number of parallel workers when sending scholarship emails
-SCHOLARSHIP_MAIL_MAX_WORKERS = config('SCHOLARSHIP_MAIL_MAX_WORKERS', default=12, cast=int)
-SCHOLARSHIP_MAIL_BCC_CHUNK_SIZE = config('SCHOLARSHIP_MAIL_BCC_CHUNK_SIZE', default=250, cast=int)
+SCHOLARSHIP_MAIL_MAX_WORKERS = config(
+    "SCHOLARSHIP_MAIL_MAX_WORKERS", default=12, cast=int
+)
+SCHOLARSHIP_MAIL_BCC_CHUNK_SIZE = config(
+    "SCHOLARSHIP_MAIL_BCC_CHUNK_SIZE", default=250, cast=int
+)
+
+# _______________________Portal Integration Settings_________________________
+PORTAL_BACKEND_URL = config("PORTAL_BACKEND_URL", default="http://localhost:8000")
+PORTAL_ONBOARDING_URL = config(
+    "PORTAL_ONBOARDING_URL",
+    default=f"{PORTAL_BACKEND_URL.rstrip('/')}/api/v1/onboarding/invite",
+)
+PORTAL_INTERNAL_API_KEY = config(
+    "PORTAL_INTERNAL_API_KEY",
+    default=config("PAYMENT_API_KEY", default=""),
+)
+PORTAL_REQUEST_TIMEOUT = config("PORTAL_REQUEST_TIMEOUT", default=10, cast=int)
+PORTAL_REQUEST_MAX_RETRIES = config("PORTAL_REQUEST_MAX_RETRIES", default=2, cast=int)
+PORTAL_REQUEST_RETRY_BACKOFF_SECONDS = config(
+    "PORTAL_REQUEST_RETRY_BACKOFF_SECONDS", default=0.5, cast=float
+)
+PORTAL_REQUEST_RETRY_STATUS_CODES = config(
+    "PORTAL_REQUEST_RETRY_STATUS_CODES",
+    default="429,500,502,503,504",
+    cast=Csv(cast=int),
+)
 
 # _______________________Redis Cache Configuration_________________________
 # Redis connection for Koyeb deployment
 # Private Address: redis-on-koyeb.male-desdemona.internal:6379
 # TCP proxy: 01.proxy.koyeb.app:12939
-REDIS_HOST = config('REDIS_HOST', default='01.proxy.koyeb.app')
-REDIS_PORT = config('REDIS_PORT', default='12939')
-REDIS_DB = config('REDIS_DB', default='0')
-REDIS_PASSWORD = config('REDIS_PASSWORD', default=None)
-    
+REDIS_HOST = config("REDIS_HOST", default="01.proxy.koyeb.app")
+REDIS_PORT = config("REDIS_PORT", default="12939")
+REDIS_DB = config("REDIS_DB", default="0")
+REDIS_PASSWORD = config("REDIS_PASSWORD", default=None)
+
 # Build Redis URL
 if REDIS_PASSWORD:
-    REDIS_URL = f'redis://:{REDIS_PASSWORD}@{REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}'
+    REDIS_URL = f"redis://:{REDIS_PASSWORD}@{REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}"
 else:
-    REDIS_URL = f'redis://{REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}'
+    REDIS_URL = f"redis://{REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}"
 
 CACHES = {
-    'default': {
-        'BACKEND': 'django_redis.cache.RedisCache',
-        'LOCATION': REDIS_URL,
-        'OPTIONS': {
-            'CLIENT_CLASS': 'django_redis.client.DefaultClient',
-            'SOCKET_CONNECT_TIMEOUT': 5,
-            'SOCKET_TIMEOUT': 5,
-            'COMPRESSOR': 'django_redis.compressors.zlib.ZlibCompressor',
-            'IGNORE_EXCEPTIONS': True,  # Don't fail if Redis is unavailable
-            'CONNECTION_POOL_KWARGS': {
-                'retry_on_timeout': True,
-                'health_check_interval': 30,
-            }
+    "default": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": REDIS_URL,
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+            "SOCKET_CONNECT_TIMEOUT": 5,
+            "SOCKET_TIMEOUT": 5,
+            "COMPRESSOR": "django_redis.compressors.zlib.ZlibCompressor",
+            "IGNORE_EXCEPTIONS": True,  # Don't fail if Redis is unavailable
+            "CONNECTION_POOL_KWARGS": {
+                "retry_on_timeout": True,
+                "health_check_interval": 30,
+            },
         },
-        'KEY_PREFIX': 'web3bridge',
-        'TIMEOUT': 300,  # 5 minutes default timeout
+        "KEY_PREFIX": "web3bridge",
+        "TIMEOUT": 300,  # 5 minutes default timeout
     }
 }
 
 # Cache settings for participant data
-PARTICIPANT_CACHE_TIMEOUT = config('PARTICIPANT_CACHE_TIMEOUT', default=600, cast=int) 
+PARTICIPANT_CACHE_TIMEOUT = config("PARTICIPANT_CACHE_TIMEOUT", default=600, cast=int)

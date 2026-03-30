@@ -1,9 +1,13 @@
-from datetime import UTC, datetime
+import asyncio
+import logging
+import secrets
+from datetime import UTC, datetime, timedelta
 
 from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import get_settings
 from app.core.security import (
     TokenType,
     create_access_token,
@@ -28,12 +32,25 @@ from app.schemas.auth import (
     AuthUserResponse,
     PasswordResetResponse,
     TokenResponse,
+    VerifyEmailResponse,
 )
+from app.services.email import EmailService
+
+settings = get_settings()
+logger = logging.getLogger(__name__)
+
+VERIFICATION_CODE_EXPIRE_MINUTES = 30
 
 
 class AuthService:
-    def __init__(self, session: AsyncSession) -> None:
+    def __init__(
+        self,
+        session: AsyncSession,
+        *,
+        email_service: EmailService | None = None,
+    ) -> None:
         self.session = session
+        self.email_service = email_service or EmailService()
 
     async def login(self, *, email: str, password: str) -> AuthResponse:
         user = await self._get_user_by_email(email)
@@ -127,10 +144,29 @@ class AuthService:
         )
 
         await self._revoke_all_user_refresh_tokens(user.id)
+
+        # Generate and store email verification code
+        code = self._generate_verification_code()
+        user.email_verification_code = code
+        user.email_verification_expires_at = datetime.now(UTC) + timedelta(
+            minutes=VERIFICATION_CODE_EXPIRE_MINUTES
+        )
+
         await self.session.commit()
         await self.session.refresh(user)
         if profile is not None:
             await self.session.refresh(profile)
+
+        # Fire-and-forget: send verification email
+        student_name = profile.full_name if profile else user.email
+        asyncio.create_task(
+            self._send_verification_email_safe(
+                to_email=user.email,
+                student_name=student_name,
+                code=code,
+            )
+        )
+
         return await self._issue_tokens_for_user(user)
 
     async def refresh(self, *, refresh_token: str) -> AuthResponse:
@@ -205,6 +241,77 @@ class AuthService:
         await self._revoke_all_user_refresh_tokens(user.id)
         await self.session.commit()
 
+    async def verify_email(self, *, user: User, code: str) -> VerifyEmailResponse:
+        if user.email_verified:
+            return VerifyEmailResponse(detail="Email already verified", email_verified=True)
+
+        if not user.email_verification_code:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No verification code found. Please request a new one.",
+            )
+
+        if (
+            user.email_verification_expires_at is not None
+            and user.email_verification_expires_at <= datetime.now(UTC)
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Verification code has expired. Please request a new one.",
+            )
+
+        if user.email_verification_code != code:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid verification code.",
+            )
+
+        user.email_verified = True
+        user.email_verification_code = None
+        user.email_verification_expires_at = None
+
+        self.session.add(
+            AuditLog(
+                actor_user_id=user.id,
+                action="email_verified",
+                resource_type="user",
+                resource_id=str(user.id),
+                after_json={"email": user.email, "email_verified": True},
+                created_at=datetime.now(UTC),
+            )
+        )
+
+        await self.session.commit()
+        await self.session.refresh(user)
+        return VerifyEmailResponse(detail="Email verified successfully", email_verified=True)
+
+    async def resend_verification_code(self, *, user: User) -> VerifyEmailResponse:
+        if user.email_verified:
+            return VerifyEmailResponse(detail="Email already verified", email_verified=True)
+
+        code = self._generate_verification_code()
+        user.email_verification_code = code
+        user.email_verification_expires_at = datetime.now(UTC) + timedelta(
+            minutes=VERIFICATION_CODE_EXPIRE_MINUTES
+        )
+        await self.session.commit()
+
+        profile = await self._get_profile_by_user_id(user.id)
+        student_name = profile.full_name if profile else user.email
+
+        asyncio.create_task(
+            self._send_verification_email_safe(
+                to_email=user.email,
+                student_name=student_name,
+                code=code,
+            )
+        )
+
+        return VerifyEmailResponse(
+            detail="Verification code sent to your email",
+            email_verified=False,
+        )
+
     async def get_user_by_id(self, user_id: int) -> User | None:
         statement = select(User).where(User.id == user_id)
         result = await self.session.execute(statement)
@@ -236,12 +343,22 @@ class AuthService:
         await self.session.commit()
         await self.session.refresh(user)
 
+        profile = await self._get_profile_by_user_id(user.id)
+
         return AuthResponse(
             user=AuthUserResponse(
                 id=user.id,
                 email=user.email,
                 role=user.role,
                 account_state=user.account_state,
+                email_verified=user.email_verified,
+                full_name=profile.full_name if profile else None,
+                phone=profile.phone if profile else None,
+                discord_id=profile.discord_id if profile else None,
+                wallet_address=profile.wallet_address if profile else None,
+                cohort=profile.cohort if profile else None,
+                onboarding_status=profile.onboarding_status if profile else None,
+                bio=profile.bio if profile else None,
             ),
             tokens=TokenResponse(
                 access_token=access_token,
@@ -263,6 +380,28 @@ class AuthService:
         statement = select(RefreshToken).where(RefreshToken.jti == jti)
         result = await self.session.execute(statement)
         return result.scalar_one_or_none()
+
+    @staticmethod
+    def _generate_verification_code() -> str:
+        return f"{secrets.randbelow(1000000):06d}"
+
+    async def _send_verification_email_safe(
+        self,
+        *,
+        to_email: str,
+        student_name: str,
+        code: str,
+    ) -> None:
+        try:
+            sent = await self.email_service.send_verification_email(
+                to_email=to_email,
+                student_name=student_name,
+                code=code,
+            )
+            if not sent:
+                logger.warning("Verification email not sent to %s", to_email)
+        except Exception:
+            logger.exception("Failed to send verification email to %s", to_email)
 
     async def _revoke_all_user_refresh_tokens(self, user_id: int) -> None:
         statement = select(RefreshToken).where(

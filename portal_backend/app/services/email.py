@@ -86,3 +86,16 @@ class EmailService:
             name=student_name, activation_url=activation_url
         )
         return await self.send_email(to_email=to_email, subject=subject, html_body=html_body)
+
+    async def send_verification_email(
+        self,
+        *,
+        to_email: str,
+        student_name: str,
+        code: str,
+    ) -> bool:
+        """Send a 6-digit email verification code to a student."""
+        from app.services.templates.verification_email import render_verification_email
+
+        subject, html_body = render_verification_email(name=student_name, code=code)
+        return await self.send_email(to_email=to_email, subject=subject, html_body=html_body)

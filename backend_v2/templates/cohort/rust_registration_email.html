@@ -54,18 +54,29 @@
         <p>Dear {{name}},</p>
 
         <p>Congratulations and welcome to the Web3Bridge Rust Program! 🎉</p>
-        <p>You’ve been selected to join a vibrant community of passionate builders committed to mastering Rust and contributing to the next generation of blockchain innovation. Over the next 12 weeks, you’ll learn, collaborate, and grow alongside other talented developers as you deepen your skills in Rust and protocol development.</p>
+        <p>You’ve been selected to join a vibrant community of passionate builders committed to mastering Rust and
+            contributing to the next generation of blockchain innovation. Over the next 12 weeks, you’ll learn,
+            collaborate, and grow alongside other talented developers as you deepen your skills in Rust and protocol
+            development.</p>
 
         <p><strong>Program Kickoff Date:</strong> January 19th, 2026</p>
-        <p>Please mark your calendar — we’ll be sharing the final curriculum, class schedule, and additional onboarding details as the date approaches.</p>
+        <p>Please mark your calendar — we’ll be sharing the final curriculum, class schedule, and additional onboarding
+            details as the date approaches.</p>
+        {% if activation_url %}
+        <p>You can activate your student portal account now to receive onboarding updates and follow your program
+            journey.</p>
+        <p><a href="{{ activation_url }}">Activate your student portal account</a></p>
+        {% endif %}
 
-        <p>Come prepared to learn intensively, build fearlessly, and contribute meaningfully. The Rust journey isn’t always easy, but it’s always worth it.</p>
+        <p>Come prepared to learn intensively, build fearlessly, and contribute meaningfully. The Rust journey isn’t
+            always easy, but it’s always worth it.</p>
 
         <p>Once again, welcome to the Web3Bridge family. Let’s write the future — one line of Rust at a time.</p>
 
         <p>Warm regards,<br>
-        The Web3Bridge Team<br>
-        <a href="https://www.web3bridge.com" target="_blank" rel="noopener">www.web3bridge.com</a></p>
+            The Web3Bridge Team<br>
+            <a href="https://www.web3bridge.com" target="_blank" rel="noopener">www.web3bridge.com</a>
+        </p>
     </div>
 </body>
 

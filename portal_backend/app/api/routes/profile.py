@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_active_user
+from app.api.deps import get_current_verified_user
 from app.db.session import get_db_session
 from app.models.portal import User
 from app.schemas.profile import MyProfileResponse, UpdateMyProfileRequest
@@ -21,7 +21,7 @@ router = APIRouter(prefix="/me", tags=["Profile"])
     ),
 )
 async def get_my_profile(
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_verified_user),
     db: AsyncSession = Depends(get_db_session),
 ) -> MyProfileResponse:
     service = ProfileService(db)
@@ -41,7 +41,7 @@ async def get_my_profile(
 )
 async def update_my_profile(
     payload: UpdateMyProfileRequest,
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_verified_user),
     db: AsyncSession = Depends(get_db_session),
 ) -> MyProfileResponse:
     service = ProfileService(db)

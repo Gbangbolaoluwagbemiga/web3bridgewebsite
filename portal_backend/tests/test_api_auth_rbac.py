@@ -85,6 +85,7 @@ def test_profile_route_returns_profile_for_active_user() -> None:
             email=user.email,
             role=user.role,
             account_state=user.account_state,
+            email_verified=True,
             full_name="Student Example",
             phone=None,
             discord_id=None,
@@ -96,7 +97,7 @@ def test_profile_route_returns_profile_for_active_user() -> None:
 
     original_method = ProfileService.get_my_profile
     ProfileService.get_my_profile = get_my_profile
-    app.dependency_overrides[deps.get_current_active_user] = override_current_active_user
+    app.dependency_overrides[deps.get_current_verified_user] = override_current_active_user
     app.dependency_overrides[get_db_session] = override_db_session
 
     try:

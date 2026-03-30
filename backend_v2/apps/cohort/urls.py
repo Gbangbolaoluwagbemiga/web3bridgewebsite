@@ -10,7 +10,7 @@ else:
     router = SimpleRouter()
 
 app_name= APP_NAME
-router.register("course", views.CouresViewSet, basename=COURSE_BASE_NAME)
+router.register("course", views.CoursesViewSet, basename=COURSE_BASE_NAME)
 router.register("registration", views.RegistrationViewSet, basename=REGISTRATION_BASE_NAME)
 router.register("participant", views.ParticipantViewSet, basename=PARTICIPANT_BASE_NAME)
 router.register("testimonial", views.TestimonialViewSet, basename=TESTIMONIAL_BASE_NAME)

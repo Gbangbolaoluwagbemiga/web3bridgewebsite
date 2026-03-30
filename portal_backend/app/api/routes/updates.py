@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import (
     get_current_active_user,
     get_current_staff_or_admin_user,
+    get_current_verified_user,
 )
 from app.db.session import get_db_session
 from app.models.portal import User
@@ -34,7 +35,7 @@ router = APIRouter(prefix="/updates", tags=["Updates"])
     ),
 )
 async def list_my_updates(
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_verified_user),
     db: AsyncSession = Depends(get_db_session),
 ) -> list[StudentUpdateResponse]:
     service = UpdatesService(db)
@@ -50,7 +51,7 @@ async def list_my_updates(
 )
 async def mark_update_as_read(
     update_id: int,
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_verified_user),
     db: AsyncSession = Depends(get_db_session),
 ) -> MarkStudentUpdateReadResponse:
     service = UpdatesService(db)

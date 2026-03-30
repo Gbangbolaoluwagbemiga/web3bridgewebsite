@@ -64,6 +64,7 @@ class ProfileService:
             email=user.email,
             role=user.role,
             account_state=user.account_state,
+            email_verified=user.email_verified,
             full_name=profile.full_name,
             phone=profile.phone,
             discord_id=profile.discord_id,
