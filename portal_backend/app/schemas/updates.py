@@ -1,0 +1,40 @@
+from datetime import datetime
+
+from pydantic import BaseModel, Field
+
+from app.models.portal import UpdateTargetType
+
+
+class StudentUpdateResponse(BaseModel):
+    id: int
+    title: str
+    body: str
+    target_type: str
+    target_ref: str | None = None
+    is_published: bool
+    published_at: datetime | None = None
+    created_by: int | None = None
+    created_at: datetime
+    updated_at: datetime
+    read_at: datetime | None = None
+
+
+class CreateStudentUpdateRequest(BaseModel):
+    title: str = Field(min_length=1, max_length=255)
+    body: str = Field(min_length=1)
+    target_type: UpdateTargetType
+    target_ref: str | None = Field(default=None, max_length=255)
+    is_published: bool = False
+
+
+class UpdateStudentUpdateRequest(BaseModel):
+    title: str | None = Field(default=None, min_length=1, max_length=255)
+    body: str | None = Field(default=None, min_length=1)
+    target_type: UpdateTargetType | None = None
+    target_ref: str | None = Field(default=None, max_length=255)
+    is_published: bool | None = None
+
+
+class MarkStudentUpdateReadResponse(BaseModel):
+    detail: str
+    read_at: datetime

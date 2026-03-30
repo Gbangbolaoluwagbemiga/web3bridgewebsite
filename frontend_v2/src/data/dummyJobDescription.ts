@@ -31,17 +31,17 @@ export const dummyJobData: JobDescription[] = [
       "Assist with color correction, audio mixing, and special effects",
       "Stay updated on industry trends and best practices",
     ],
-    Qualifications:[
-     " Proficiency in video editing software (e.g., Adobe Premiere Pro, Final Cut Pro)",
-   " Experience with YouTube content creation is a plus",
-    "Strong attention to detail and organizational skills",
-   " Knowledge of the production process",
-    "Basic knowledge of audio editing and mixing",
-   " Excellent organizational and time management skills",
-    "Ability to work collaboratively in a fast-paced environment",
-    "Passion for visual storytelling and media production",
-    "Excellent communication skills",
-    "Organized, goal-oriented, and result-driven"
+    Qualifications: [
+      " Proficiency in video editing software (e.g., Adobe Premiere Pro, Final Cut Pro)",
+      " Experience with YouTube content creation is a plus",
+      "Strong attention to detail and organizational skills",
+      " Knowledge of the production process",
+      "Basic knowledge of audio editing and mixing",
+      " Excellent organizational and time management skills",
+      "Ability to work collaboratively in a fast-paced environment",
+      "Passion for visual storytelling and media production",
+      "Excellent communication skills",
+      "Organized, goal-oriented, and result-driven"
     ],
   },
   {
@@ -49,7 +49,7 @@ export const dummyJobData: JobDescription[] = [
     title: "Secretary",
     workplaceType: "Remote",
     employmentTYpe: "Full-Time",
-   companyOverview:
+    companyOverview:
       "Web3bridge is an organization dedicated to building a thriving community of blockchain developers, enthusiasts, and contributors across Africa. We offer training, mentorship, and support for individuals keen on learning about Web3 technologies, blockchain development, and decentralized applications (dApps). Our hands-on cohort-based learning programs, technical bootcamps, and community-driven initiatives equip participants with the skills needed to make meaningful contributions to the blockchain ecosystem. At Web3bridge, our media team plays a crucial role in capturing the essence of our journey. Through weekly video projects, cohort introduction videos, and engaging visual content that highlights our students’ and mentors’ experiences, we bring our community’s stories to life.",
     jobDescription:
       "We are seeking a highly organized and detail-oriented Secretary to join our dynamic team. The Secretary will play a critical role in managing key administrative tasks for our cohort programs and maintaining smooth communication within the team and with external stakeholders. The ideal candidate will be responsible for managing important documents, coordinating schedules, and ensuring the timely execution of tasks.",
@@ -62,17 +62,17 @@ export const dummyJobData: JobDescription[] = [
       "Meeting and Communication Coordination: Prepare meeting agendas and take minutes during team meetings, ensuring all actions and discussions are properly documented and followed up on. Act as the central point of contact for internal communications between different departments and teams.",
       "Feedback and Report Preparation: Assist in organizing and collecting feedback from students and mentors to help improve the cohort experience. Prepare progress reports by compiling data from registration sheets, assessments, and feedback for management review.",
       "Event and Workshop Logistics Support: Assist in coordinating logistics for cohort events, workshops, and webinars, ensuring that everything runs smoothly and efficiently."
-   ],
+    ],
 
     Qualifications: [
       "Proven experience as a secretary, administrative assistant, or in a similar role.",
       "Strong organizational and time-management skills.",
-     " Proficiency in Microsoft Office, Google Workspace, and other relevant office software.",
+      " Proficiency in Microsoft Office, Google Workspace, and other relevant office software.",
       "Excellent communication skills, both written and verbal.",
       "Attention to detail and ability to manage multiple tasks simultaneously.",
       "Ability to maintain confidentiality and handle sensitive information.",
     ],
-    jobRequirements:[
+    jobRequirements: [
       "Experience in an educational or cohort-based environment.",
       "Familiarity with online collaboration tools and project management software."
     ]

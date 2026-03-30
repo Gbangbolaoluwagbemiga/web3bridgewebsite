@@ -124,14 +124,14 @@ class ParticipantSerializer:
         email = serializers.EmailField(required=True)
         registration = serializers.PrimaryKeyRelatedField(queryset=models.Registration.objects.all(), required=True)
         course = serializers.PrimaryKeyRelatedField(queryset=models.Course.objects.all(), required=True)
-        motivation = serializers.CharField(required=True)
-        achievement = serializers.CharField(required=True)
+        motivation = serializers.CharField(required=False, allow_blank=True, default="")
+        achievement = serializers.CharField(required=False, allow_blank=True, default="")
         city = serializers.CharField(required=True)
-        state = serializers.CharField(required=True)
+        state = serializers.CharField(required=False, allow_blank=True, default="")
         country = serializers.CharField(required=True)
         gender = serializers.CharField(required=True)
         github = serializers.URLField(required=False)
-        number = serializers.CharField(required=True)
+        number = serializers.CharField(required=False, allow_blank=True, default="")
         venue = serializers.CharField(required=True)
         class Meta:
             model = models.Participant

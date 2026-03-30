@@ -1,0 +1,10 @@
+.env
+.env.local
+__pycache__
+*.pyc
+.vscode
+.git
+tests
+docs
+*.md
+.ruff_cache

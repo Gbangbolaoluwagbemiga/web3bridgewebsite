@@ -1,10 +1,11 @@
-from django.conf import settings
-from django.core.mail import send_mail
-from django.conf import settings
+import logging
 import re
-from django.template.loader import render_to_string
+
+from django.conf import settings
 from django.core.mail import EmailMessage
-import re
+from django.template.loader import render_to_string
+
+logger = logging.getLogger(__name__)
 
 # Testimonial image storage location
 
@@ -37,7 +38,9 @@ def send_registration_success_mail(email, course_id, participant):
             subject = f'{course.name} Registration Success'
             template_name = 'other_registration_email.html'
 
-        context = {'name': participant}
+        context = {
+            'name': participant,
+        }
         message = render_to_string(template_name, context)
 
         # Use admission email credentials if available, otherwise fall back to default

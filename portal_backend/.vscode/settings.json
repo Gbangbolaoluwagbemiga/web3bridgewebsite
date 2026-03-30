@@ -1,0 +1,17 @@
+{
+    "python.defaultInterpreterPath": "/usr/bin/python",
+    "workbench.editorAssociations": {
+        "*.py": "default"
+    },
+    "python.analysis.extraPaths": [
+        "${workspaceFolder}",
+        "${workspaceFolder}/app"
+    ],
+    "python.testing.pytestEnabled": true,
+    "python.testing.pytestArgs": [
+        "tests"
+    ],
+    "files.associations": {
+        "*.py": "python"
+    }
+}

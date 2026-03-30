@@ -1,0 +1,34 @@
+services:
+  portal_postgres:
+    image: postgres:16-alpine
+    container_name: portal_postgres
+    environment:
+      POSTGRES_DB: portal_v1
+      POSTGRES_USER: portal_user
+      POSTGRES_PASSWORD: portal_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - portal_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U portal_user -d portal_v1" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  portal_redis:
+    image: redis:7-alpine
+    container_name: portal_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - portal_redis_data:/data
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  portal_postgres_data:
+  portal_redis_data:
