@@ -210,8 +210,11 @@ class CheckInSerializer:
     class List(serializers.ModelSerializer):
         registration_name = serializers.CharField(source='registration.name', read_only=True)
         registration_email = serializers.EmailField(source='registration.email', read_only=True)
-        space_name = serializers.CharField(source='space.name', read_only=True)
-        
+        space_name = serializers.SerializerMethodField()
+
+        def get_space_name(self, obj):
+            return obj.space.name if obj.space_id else None
+
         class Meta:
             model = models.CheckIn
             fields = ["id", "registration", "registration_name", "registration_email", 
@@ -223,7 +226,10 @@ class CheckInSerializer:
         registration_name = serializers.CharField(source='registration.name', read_only=True)
         registration_email = serializers.EmailField(source='registration.email', read_only=True)
         registration_phone = serializers.CharField(source='registration.phone_number', read_only=True)
-        space_name = serializers.CharField(source='space.name', read_only=True)
+        space_name = serializers.SerializerMethodField()
+
+        def get_space_name(self, obj):
+            return obj.space.name if obj.space_id else None
         
         class Meta:
             model = models.CheckIn

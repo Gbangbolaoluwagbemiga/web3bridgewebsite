@@ -1,6 +1,6 @@
 
 from rest_framework import decorators, status, viewsets
-from django.db.models import Q, Count
+from django.db.models import Q, Sum
 from django.utils import timezone
 from datetime import timedelta
 from . import serializers, models
@@ -8,6 +8,7 @@ from utils.helpers.requests import Utils as requestUtils
 from drf_yasg.utils import swagger_auto_schema
 from utils.helpers.mixins import GuestReadAllWriteAdminOnlyPermissionMixin
 from .helpers.email import send_hub_admin_registration_email, send_hub_registration_email, send_hub_approval_email, send_hub_rejection_email
+from .helpers.pagination import paginate_queryset
 
 
 class HubSpaceViewSet(GuestReadAllWriteAdminOnlyPermissionMixin, viewsets.ViewSet):
@@ -36,10 +37,14 @@ class HubSpaceViewSet(GuestReadAllWriteAdminOnlyPermissionMixin, viewsets.ViewSe
     
     @decorators.action(detail=False, methods=["get"])
     def all(self, request, *args, **kwargs):
-        """Get all hub spaces"""
+        """Get hub spaces (paginated: page, limit; default limit 100, max 200)."""
         queryset = self.queryset.filter(is_active=True).order_by('-created_at')
-        serializer = self.serializer_class.List(queryset, many=True)
-        return requestUtils.success_response(data=serializer.data, http_status=status.HTTP_200_OK)
+        page_rows, pagination = paginate_queryset(request, queryset, default_limit=100, max_limit=200)
+        serializer = self.serializer_class.List(page_rows, many=True)
+        return requestUtils.success_response(
+            data={"results": serializer.data, "pagination": pagination},
+            http_status=status.HTTP_200_OK,
+        )
     
     def retrieve(self, request, pk, *args, **kwargs):
         """Get a specific hub space"""
@@ -101,10 +106,14 @@ class HubSpaceViewSet(GuestReadAllWriteAdminOnlyPermissionMixin, viewsets.ViewSe
     def stats(self, request, *args, **kwargs):
         """Get hub space statistics"""
         spaces = self.queryset.filter(is_active=True)
-        total_capacity = sum(space.total_capacity for space in spaces)
-        total_occupancy = sum(space.current_occupancy for space in spaces)
+        agg = spaces.aggregate(
+            total_capacity=Sum("total_capacity"),
+            total_occupancy=Sum("current_occupancy"),
+        )
+        total_capacity = agg["total_capacity"] or 0
+        total_occupancy = agg["total_occupancy"] or 0
         total_available = total_capacity - total_occupancy
-        
+
         stats = {
             "total_spaces": spaces.count(),
             "total_capacity": total_capacity,
@@ -112,7 +121,7 @@ class HubSpaceViewSet(GuestReadAllWriteAdminOnlyPermissionMixin, viewsets.ViewSe
             "total_available": total_available,
             "occupancy_percentage": (total_occupancy / total_capacity * 100) if total_capacity > 0 else 0,
         }
-        
+
         return requestUtils.success_response(data=stats, http_status=status.HTTP_200_OK)
 
 
@@ -155,21 +164,25 @@ class HubRegistrationViewSet(GuestReadAllWriteAdminOnlyPermissionMixin, viewsets
     
     @decorators.action(detail=False, methods=["get"])
     def all(self, request, *args, **kwargs):
-        """Get recent hub registrations (last 90 days, excluding old rejected ones)"""
-        # Only get registrations from the last 90 days
+        """Get recent hub registrations (last 90 days, excluding old rejected ones).
+
+        Paginated: query params `page`, `limit` (default 100, max 200).
+        """
         cutoff_date = timezone.now() - timedelta(days=90)
-        
-        # For public: only show pending and approved from recent period
-        # For admin: show all recent, but exclude very old rejected ones
+
         queryset = self.queryset.filter(
             created_at__gte=cutoff_date
         ).exclude(
-            # Exclude old rejected registrations (older than 30 days)
-            Q(status=models.HubRegistration.REJECTED) & Q(created_at__lt=timezone.now() - timedelta(days=30))
+            Q(status=models.HubRegistration.REJECTED)
+            & Q(created_at__lt=timezone.now() - timedelta(days=30))
         ).order_by('-created_at')
-        
-        serializer = self.serializer_class.List(queryset, many=True)
-        return requestUtils.success_response(data=serializer.data, http_status=status.HTTP_200_OK)
+
+        page_rows, pagination = paginate_queryset(request, queryset, default_limit=100, max_limit=200)
+        serializer = self.serializer_class.List(page_rows, many=True)
+        return requestUtils.success_response(
+            data={"results": serializer.data, "pagination": pagination},
+            http_status=status.HTTP_200_OK,
+        )
     
     def retrieve(self, request, pk, *args, **kwargs):
         """Get a specific hub registration"""
@@ -339,18 +352,24 @@ class HubRegistrationViewSet(GuestReadAllWriteAdminOnlyPermissionMixin, viewsets
     
     @decorators.action(detail=False, methods=["get"])
     def by_status(self, request, *args, **kwargs):
-        """Get registrations by status (admin only) - only recent data (last 90 days)"""
-        # Only get recent registrations (last 90 days)
+        """Get registrations by status (admin only) - only recent data (last 90 days).
+
+        Paginated: `page`, `limit` (default 100, max 200).
+        """
         cutoff_date = timezone.now() - timedelta(days=90)
         queryset = self.queryset.filter(created_at__gte=cutoff_date)
-        
+
         status_filter = request.query_params.get('status', None)
         if status_filter:
             queryset = queryset.filter(status=status_filter)
-        
+
         queryset = queryset.order_by('-created_at')
-        serializer = self.serializer_class.List(queryset, many=True)
-        return requestUtils.success_response(data=serializer.data, http_status=status.HTTP_200_OK)
+        page_rows, pagination = paginate_queryset(request, queryset, default_limit=100, max_limit=200)
+        serializer = self.serializer_class.List(page_rows, many=True)
+        return requestUtils.success_response(
+            data={"results": serializer.data, "pagination": pagination},
+            http_status=status.HTTP_200_OK,
+        )
     
     @decorators.action(detail=False, methods=["get"])
     def available_slots(self, request, *args, **kwargs):
@@ -429,6 +448,7 @@ class CheckInViewSet(GuestReadAllWriteAdminOnlyPermissionMixin, viewsets.ViewSet
         
         if serializer.is_valid():
             checkin_obj = serializer.save()
+            checkin_obj = self.queryset.select_related('registration', 'space').get(pk=checkin_obj.pk)
             serialized_obj = self.serializer_class.Retrieve(checkin_obj).data
             return requestUtils.success_response(
                 data=serialized_obj, 
@@ -443,26 +463,42 @@ class CheckInViewSet(GuestReadAllWriteAdminOnlyPermissionMixin, viewsets.ViewSet
     
     @decorators.action(detail=False, methods=["get"])
     def all(self, request, *args, **kwargs):
-        """Get recent check-ins (admin only) - last 30 days or all active ones"""
-        # Get check-ins from last 30 days OR all currently checked in
+        """Get recent check-ins — last 30 days or all currently checked in.
+
+        Uses select_related to avoid N+1 queries. Paginated: `page`, `limit` (default 100, max 200).
+        """
         cutoff_date = timezone.now() - timedelta(days=30)
-        queryset = self.queryset.filter(
-            Q(check_in_time__gte=cutoff_date) | Q(status=models.CheckIn.CHECKED_IN)
-        ).order_by('-check_in_time')
-        serializer = self.serializer_class.List(queryset, many=True)
-        return requestUtils.success_response(data=serializer.data, http_status=status.HTTP_200_OK)
-    
+        queryset = (
+            self.queryset.select_related('registration', 'space')
+            .filter(Q(check_in_time__gte=cutoff_date) | Q(status=models.CheckIn.CHECKED_IN))
+            .order_by('-check_in_time')
+        )
+        page_rows, pagination = paginate_queryset(request, queryset, default_limit=100, max_limit=200)
+        serializer = self.serializer_class.List(page_rows, many=True)
+        return requestUtils.success_response(
+            data={"results": serializer.data, "pagination": pagination},
+            http_status=status.HTTP_200_OK,
+        )
+
     @decorators.action(detail=False, methods=["get"])
     def active(self, request, *args, **kwargs):
-        """Get all currently checked-in visitors"""
-        queryset = self.queryset.filter(status=models.CheckIn.CHECKED_IN).order_by('-check_in_time')
-        serializer = self.serializer_class.List(queryset, many=True)
-        return requestUtils.success_response(data=serializer.data, http_status=status.HTTP_200_OK)
+        """Get all currently checked-in visitors (paginated)."""
+        queryset = (
+            self.queryset.select_related('registration', 'space')
+            .filter(status=models.CheckIn.CHECKED_IN)
+            .order_by('-check_in_time')
+        )
+        page_rows, pagination = paginate_queryset(request, queryset, default_limit=100, max_limit=200)
+        serializer = self.serializer_class.List(page_rows, many=True)
+        return requestUtils.success_response(
+            data={"results": serializer.data, "pagination": pagination},
+            http_status=status.HTTP_200_OK,
+        )
     
     def retrieve(self, request, pk, *args, **kwargs):
         """Get a specific check-in"""
         try:
-            checkin_obj = self.queryset.get(pk=pk)
+            checkin_obj = self.queryset.select_related('registration', 'space').get(pk=pk)
             serializer = self.serializer_class.Retrieve(checkin_obj)
             return requestUtils.success_response(data=serializer.data, http_status=status.HTTP_200_OK)
         except models.CheckIn.DoesNotExist:
@@ -476,8 +512,8 @@ class CheckInViewSet(GuestReadAllWriteAdminOnlyPermissionMixin, viewsets.ViewSet
     def check_out(self, request, pk, *args, **kwargs):
         """Check out a visitor"""
         try:
-            checkin_obj = self.queryset.get(pk=pk)
-            
+            checkin_obj = self.queryset.select_related('registration', 'space').get(pk=pk)
+
             if checkin_obj.status == models.CheckIn.CHECKED_OUT:
                 return requestUtils.error_response(
                     "Visitor is already checked out", 
@@ -486,8 +522,9 @@ class CheckInViewSet(GuestReadAllWriteAdminOnlyPermissionMixin, viewsets.ViewSet
                 )
             
             success = checkin_obj.check_out()
-            
+
             if success:
+                checkin_obj = self.queryset.select_related('registration', 'space').get(pk=checkin_obj.pk)
                 serialized_obj = self.serializer_class.Retrieve(checkin_obj).data
                 return requestUtils.success_response(
                     data=serialized_obj, 
@@ -519,11 +556,15 @@ class CheckInViewSet(GuestReadAllWriteAdminOnlyPermissionMixin, viewsets.ViewSet
             )
         
         try:
-            checkin_obj = self.queryset.filter(
-                registration_id=registration_id,
-                status=models.CheckIn.CHECKED_IN
-            ).first()
-            
+            checkin_obj = (
+                self.queryset.select_related('registration', 'space')
+                .filter(
+                    registration_id=registration_id,
+                    status=models.CheckIn.CHECKED_IN,
+                )
+                .first()
+            )
+
             if not checkin_obj:
                 return requestUtils.error_response(
                     "No active check-in found for this registration", 
@@ -532,8 +573,9 @@ class CheckInViewSet(GuestReadAllWriteAdminOnlyPermissionMixin, viewsets.ViewSet
                 )
             
             success = checkin_obj.check_out()
-            
+
             if success:
+                checkin_obj = self.queryset.select_related('registration', 'space').get(pk=checkin_obj.pk)
                 serialized_obj = self.serializer_class.Retrieve(checkin_obj).data
                 return requestUtils.success_response(
                     data=serialized_obj, 
@@ -555,7 +597,7 @@ class CheckInViewSet(GuestReadAllWriteAdminOnlyPermissionMixin, viewsets.ViewSet
     def destroy(self, request, pk, *args, **kwargs):
         """Delete a check-in (admin only)"""
         try:
-            checkin_obj = self.queryset.get(pk=pk)
+            checkin_obj = self.queryset.select_related('space').get(pk=pk)
             
             # If checked in, decrease occupancy before deleting
             if checkin_obj.status == models.CheckIn.CHECKED_IN and checkin_obj.space:
@@ -696,3 +738,109 @@ class BlockedDateRangeViewSet(GuestReadAllWriteAdminOnlyPermissionMixin, viewset
                 http_status=status.HTTP_404_NOT_FOUND
             )
 
+
+class HubExportViewSet(GuestReadAllWriteAdminOnlyPermissionMixin, viewsets.ViewSet):
+    """
+    Full hub dataset for offline CSV / reporting.
+    Requires admin auth (same as other hub write/admin operations).
+    """
+
+    admin_actions = ["datasets"]
+
+    @swagger_auto_schema(
+        operation_summary="Export all hub data as JSON (for CSV on the client)",
+        operation_description=(
+            "Returns spaces, registrations, check_ins, and blocked_date_ranges in one payload. "
+            "Uses efficient values() queries (no N+1)."
+        ),
+    )
+    @decorators.action(detail=False, methods=["get"], url_path="datasets")
+    def datasets(self, request, *args, **kwargs):
+        spaces = list(
+            models.HubSpace.objects.order_by("id").values(
+                "id",
+                "name",
+                "total_capacity",
+                "current_occupancy",
+                "is_active",
+                "created_at",
+                "updated_at",
+            )
+        )
+
+        registrations = list(
+            models.HubRegistration.objects.order_by("-created_at").values(
+                "id",
+                "name",
+                "email",
+                "phone_number",
+                "location",
+                "reason",
+                "role",
+                "contribution",
+                "status",
+                "notes",
+                "preferred_date",
+                "preferred_time",
+                "expected_duration_hours",
+                "created_at",
+                "updated_at",
+            )
+        )
+
+        checkin_rows = models.CheckIn.objects.order_by("-check_in_time").values(
+            "id",
+            "registration_id",
+            "registration__name",
+            "registration__email",
+            "registration__phone_number",
+            "space_id",
+            "space__name",
+            "status",
+            "check_in_time",
+            "check_out_time",
+            "purpose",
+            "notes",
+            "created_at",
+            "updated_at",
+        )
+        check_ins = [
+            {
+                "id": row["id"],
+                "registration_id": row["registration_id"],
+                "registration_name": row["registration__name"],
+                "registration_email": row["registration__email"],
+                "registration_phone": row["registration__phone_number"],
+                "space_id": row["space_id"],
+                "space_name": row["space__name"],
+                "status": row["status"],
+                "check_in_time": row["check_in_time"],
+                "check_out_time": row["check_out_time"],
+                "purpose": row["purpose"],
+                "notes": row["notes"],
+                "created_at": row["created_at"],
+                "updated_at": row["updated_at"],
+            }
+            for row in checkin_rows
+        ]
+
+        blocked_date_ranges = list(
+            models.BlockedDateRange.objects.order_by("-start_date").values(
+                "id",
+                "start_date",
+                "end_date",
+                "reason",
+                "is_active",
+                "created_at",
+                "updated_at",
+            )
+        )
+
+        payload = {
+            "exported_at": timezone.now().isoformat(),
+            "spaces": spaces,
+            "registrations": registrations,
+            "check_ins": check_ins,
+            "blocked_date_ranges": blocked_date_ranges,
+        }
+        return requestUtils.success_response(data=payload, http_status=status.HTTP_200_OK)
