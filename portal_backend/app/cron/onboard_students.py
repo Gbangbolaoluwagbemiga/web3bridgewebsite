@@ -51,7 +51,7 @@ def _is_zk_course(course_name: str | None) -> bool:
 
 
 def _build_activation_url(token: str) -> str:
-    return f"{settings.PORTAL_FRONTEND_URL.rstrip('/')}/activate?token={token}"
+    return f"{settings.PORTAL_FRONTEND_URL.rstrip('/')}/activate/onboard?token={token}"
 
 
 async def _get_last_successful_cursor(session: AsyncSession) -> str | None:
