@@ -174,10 +174,7 @@ export default function RegistrationPage() {
         await getUserData(userForm);
         toast.dismiss(loadingToastId);
         
-        if (isZKCourse(courseName)) {
-          toast.success("Registration submitted successfully! Our team will review your application.");
-          setIsRegistered(true);
-        } else if (courseName.toLowerCase().includes("solidity")) {
+        if (courseName.toLowerCase().includes("solidity")) {
           toast.success("Registration successful! Redirecting to assessment...");
           setTimeout(() => {
             window.location.href = "https://assessment-incoming.vercel.app/";
