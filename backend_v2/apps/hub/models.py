@@ -128,6 +128,11 @@ class CheckIn(BaseModelBaseMixin, models.Model):
             models.Index(fields=['-check_in_time'], name='checkin_time_idx'),
             models.Index(fields=['status'], name='checkin_status_idx'),
             models.Index(fields=['registration'], name='checkin_registration_idx'),
+            # Common admin filters: status + time range / ordering
+            models.Index(
+                fields=['status', 'check_in_time'],
+                name='checkin_status_checkin_time_idx',
+            ),
         ]
         ordering = ['-check_in_time']
     

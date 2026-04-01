@@ -14,6 +14,7 @@ router.register("space", views.HubSpaceViewSet, basename="hub-space")
 router.register("registration", views.HubRegistrationViewSet, basename=HUB_REGISTRATION_BASE_NAME)
 router.register("checkin", views.CheckInViewSet, basename="hub-checkin")
 router.register("blocked-dates", views.BlockedDateRangeViewSet, basename="hub-blocked-dates")
+router.register("export", views.HubExportViewSet, basename="hub-export")
 
 urlpatterns = router.urls
 

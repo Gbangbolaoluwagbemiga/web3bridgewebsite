@@ -104,3 +104,28 @@ export const hubRegistrationSchema = z.object({
     .default(4)
     .optional(),
 });
+
+export const unifiedRegistrationSchema = z.object({
+  course: z.string({ required_error: "Please select a course." }).min(1),
+  name: z
+    .string({ required_error: "Full name is required" })
+    .min(2, "Name must be at least 2 characters.")
+    .max(50, "Name must be less than 50 characters."),
+  email: z
+    .string({ required_error: "Email address is required" })
+    .email("Please enter a valid email address")
+    .min(2),
+  number: z
+    .string({ required_error: "Phone number is required" })
+    .min(5, "Phone number must be at least 5 characters.")
+    .max(20, "Phone number must be less than 20 characters."),
+  github: z
+    .string({ required_error: "Github profile link is required" })
+    .url("Please enter a valid GitHub URL")
+    .min(5)
+    .optional()
+    .or(z.literal("")),
+  country: z.string({ required_error: "Please select your country" }).min(1),
+  state: z.string({ required_error: "Please select your state" }).min(1),
+  venue: z.string({ required_error: "Please select a venue" }).optional(),
+});
