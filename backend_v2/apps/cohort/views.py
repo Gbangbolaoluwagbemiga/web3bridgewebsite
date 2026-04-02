@@ -15,6 +15,8 @@ from rest_framework.response import Response
 from . import models, serializers
 from .helpers.model import (
     send_approval_email,
+    send_assessment_failed_email,
+    send_assessment_passed_email,
     send_participant_details,
     send_registration_success_mail,
     send_reschedule_assessment_email,
@@ -640,6 +642,72 @@ class ParticipantViewSet(GuestReadAllWriteAdminOnlyPermissionMixin, viewsets.Vie
         return requestUtils.success_response(
             data={"message": f"Reschedule assessment email sent to {email}"},
             http_status=status.HTTP_200_OK,
+        )
+
+    @swagger_auto_schema(request_body=serializers.SubmitAssessmentSerializer)
+    @decorators.action(detail=False, methods=["post"], url_path="submit-assessment")
+    def submit_assessment(self, request, *args, **kwargs):
+        """
+        Submit an assessment result for a participant.
+        Creates an Assessment record and sends a pass or fail email.
+        Requires a valid API-Key header.
+        """
+        if not self.check_api_key(request):
+            return Response(
+                {"error": "Invalid or missing API key"},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+
+        serializer = serializers.SubmitAssessmentSerializer(data=request.data)
+        if not serializer.is_valid():
+            return requestUtils.error_response(
+                "Invalid request data", serializer.errors, http_status=status.HTTP_400_BAD_REQUEST
+            )
+
+        email = serializer.validated_data["email"]
+        score = serializer.validated_data["score"]
+        passed = serializer.validated_data["passed"]
+
+        # Find participant by email
+        participant = models.Participant.objects.filter(email=email).first()
+        if not participant:
+            return requestUtils.error_response(
+                "Participant not found",
+                {"detail": "No participant found with this email. Please register first."},
+                http_status=status.HTTP_404_NOT_FOUND,
+            )
+
+        # Block duplicate assessment for the same cohort
+        already_exists = models.Assessment.objects.filter(
+            participant=participant,
+            participant__registration=participant.registration,
+        ).exists()
+        if already_exists:
+            return requestUtils.error_response(
+                "Assessment already submitted",
+                {"detail": "An assessment record already exists for this participant in this cohort."},
+                http_status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Create assessment record
+        from django.utils import timezone
+        models.Assessment.objects.create(
+            participant=participant,
+            score=score,
+            passed=passed,
+            date_taken=timezone.now(),
+        )
+
+        # Send appropriate email
+        payment_link = "https://payment.web3bridgeafrica.com"
+        if passed:
+            send_assessment_passed_email(email, participant.name, participant.cohort, score, payment_link)
+        else:
+            send_assessment_failed_email(email, participant.name, participant.cohort, score)
+
+        return requestUtils.success_response(
+            data={"message": f"Assessment submitted and email sent to {email}"},
+            http_status=status.HTTP_201_CREATED,
         )
 
     @swagger_auto_schema(request_body=serializers.ParticipantSerializer.Update())

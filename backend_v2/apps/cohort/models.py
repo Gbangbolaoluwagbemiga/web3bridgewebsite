@@ -201,3 +201,26 @@ class AssessmentReschedule(models.Model):
 
     def __str__(self):
         return f"< {type(self).__name__}({self.email}) >"
+
+
+class Assessment(models.Model):
+    """Stores assessment results for a participant per cohort."""
+    participant = models.ForeignKey(
+        Participant,
+        on_delete=models.CASCADE,
+        related_name='assessments',
+    )
+    score = models.DecimalField(_('score'), max_digits=5, decimal_places=2)
+    date_taken = models.DateTimeField(_('date taken'))
+    passed = models.BooleanField(_('passed'), default=False)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['participant'], name='assessment_participant_idx'),
+        ]
+
+    def __str__(self):
+        return f"< {type(self).__name__}({self.participant.name} - {self.score}) >"

@@ -403,3 +403,129 @@ class RescheduleAssessmentTemplateTests(SimpleTestCase):
             "assessment_link": "https://calendly.com/web3bridge/assessment",
         })
         self.assertIn("3 days", rendered)
+
+
+@override_settings(SECURE_SSL_REDIRECT=False)
+class SubmitAssessmentEndpointTests(TestCase):
+    """Tests for POST /api/v2/cohort/participant/submit-assessment/"""
+
+    ENDPOINT = "/api/v2/cohort/participant/submit-assessment/"
+    API_KEY = "EY63JDFEE9GKNJDBDJ"
+
+    def setUp(self):
+        self.client = APIClient()
+        # Create prerequisite objects
+        from cohort.models import Registration, Course, Participant
+        self.registration = Registration.objects.create(
+            name="Web3 Cohort XIV", cohort="Cohort-XIV", is_open=True
+        )
+        self.course = Course.objects.create(
+            name="Web3 Development",
+            description="Learn Web3",
+            extra_info="Extra",
+            registration=self.registration,
+        )
+        self.participant = Participant.objects.create(
+            name="John Doe",
+            email="john@example.com",
+            wallet_address="0x123",
+            registration=self.registration,
+            course=self.course,
+            cohort="Cohort-XIV",
+            venue="online",
+        )
+
+    def _post(self, payload, api_key=None):
+        key = api_key if api_key is not None else self.API_KEY
+        return self.client.post(
+            self.ENDPOINT, payload, format="json", headers={"API-Key": key}
+        )
+
+    def _post_no_key(self, payload):
+        return self.client.post(self.ENDPOINT, payload, format="json")
+
+    @patch("cohort.views.send_assessment_passed_email")
+    def test_pass_creates_assessment_and_sends_passed_email(self, mock_passed):
+        payload = {"email": "john@example.com", "score": "85.50", "passed": True}
+        response = self._post(payload)
+
+        self.assertEqual(response.status_code, 201)
+        from cohort.models import Assessment
+        self.assertTrue(Assessment.objects.filter(participant=self.participant, passed=True).exists())
+        mock_passed.assert_called_once()
+
+    @patch("cohort.views.send_assessment_failed_email")
+    def test_fail_creates_assessment_and_sends_failed_email(self, mock_failed):
+        payload = {"email": "john@example.com", "score": "40.00", "passed": False}
+        response = self._post(payload)
+
+        self.assertEqual(response.status_code, 201)
+        from cohort.models import Assessment
+        self.assertTrue(Assessment.objects.filter(participant=self.participant, passed=False).exists())
+        mock_failed.assert_called_once()
+
+    @patch("cohort.views.send_assessment_passed_email")
+    def test_duplicate_assessment_same_cohort_is_blocked(self, mock_passed):
+        payload = {"email": "john@example.com", "score": "85.50", "passed": True}
+        self._post(payload)
+        response = self._post(payload)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("already submitted", response.json()["message"].lower())
+
+    @patch("cohort.views.send_assessment_passed_email")
+    def test_missing_api_key_returns_401(self, mock_passed):
+        payload = {"email": "john@example.com", "score": "85.50", "passed": True}
+        response = self._post_no_key(payload)
+
+        self.assertEqual(response.status_code, 401)
+        mock_passed.assert_not_called()
+
+    @patch("cohort.views.send_assessment_passed_email")
+    def test_wrong_api_key_returns_401(self, mock_passed):
+        payload = {"email": "john@example.com", "score": "85.50", "passed": True}
+        response = self._post(payload, api_key="wrong-key")
+
+        self.assertEqual(response.status_code, 401)
+        mock_passed.assert_not_called()
+
+    @patch("cohort.views.send_assessment_passed_email")
+    def test_unknown_email_returns_404(self, mock_passed):
+        payload = {"email": "nobody@example.com", "score": "85.50", "passed": True}
+        response = self._post(payload)
+
+        self.assertEqual(response.status_code, 404)
+        mock_passed.assert_not_called()
+
+    @patch("cohort.views.send_assessment_passed_email")
+    def test_invalid_score_returns_400(self, mock_passed):
+        payload = {"email": "john@example.com", "score": "not-a-number", "passed": True}
+        response = self._post(payload)
+
+        self.assertEqual(response.status_code, 400)
+        mock_passed.assert_not_called()
+
+
+class SubmitAssessmentTemplateTests(SimpleTestCase):
+    """Verify pass/fail email templates render correctly."""
+
+    def test_passed_template_renders_name_score_payment_link(self):
+        rendered = render_to_string("cohort/assessment_passed_email.html", {
+            "name": "John Doe",
+            "cohort": "Web3 Cohort XIV",
+            "score": "85.50",
+            "payment_link": "https://payment.web3bridgeafrica.com",
+        })
+        self.assertIn("John Doe", rendered)
+        self.assertIn("85.50", rendered)
+        self.assertIn("https://payment.web3bridgeafrica.com", rendered)
+
+    def test_failed_template_renders_name_score_and_encouragement(self):
+        rendered = render_to_string("cohort/assessment_failed_email.html", {
+            "name": "John Doe",
+            "cohort": "Web3 Cohort XIV",
+            "score": "40.00",
+        })
+        self.assertIn("John Doe", rendered)
+        self.assertIn("40.00", rendered)
+        self.assertIn("next cohort", rendered.lower())

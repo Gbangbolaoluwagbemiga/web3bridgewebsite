@@ -265,3 +265,66 @@ def send_approval_email(participant, payment_link: str | None = None):
         email_msg.send(fail_silently=True)
     except Exception:
         pass
+
+
+def send_assessment_passed_email(email, name, cohort, score, payment_link):
+    """Send a congratulations email with a payment CTA when a participant passes."""
+    try:
+        context = {
+            "name": name,
+            "cohort": cohort,
+            "score": score,
+            "payment_link": payment_link,
+        }
+        message = render_to_string("cohort/assessment_passed_email.html", context)
+        subject = f"Congratulations! You Passed Your Web3Bridge Assessment – {cohort}"
+        from_email = getattr(settings, "ADMISSION_EMAIL_HOST_USER", "admission@web3bridge.com")
+
+        email_msg = EmailMessage(subject=subject, body=message, from_email=from_email, to=[email])
+        email_msg.content_subtype = "html"
+
+        if hasattr(settings, "ADMISSION_EMAIL_HOST_USER") and hasattr(settings, "ADMISSION_EMAIL_HOST_PASSWORD"):
+            from django.core.mail import get_connection
+            connection = get_connection(
+                host=getattr(settings, "ADMISSION_EMAIL_HOST", settings.EMAIL_HOST),
+                port=getattr(settings, "ADMISSION_EMAIL_PORT", settings.EMAIL_PORT),
+                username=getattr(settings, "ADMISSION_EMAIL_HOST_USER"),
+                password=getattr(settings, "ADMISSION_EMAIL_HOST_PASSWORD"),
+                use_tls=getattr(settings, "ADMISSION_EMAIL_USE_TLS", settings.EMAIL_USE_TLS),
+            )
+            email_msg.connection = connection
+
+        email_msg.send(fail_silently=False)
+    except Exception:
+        pass
+
+
+def send_assessment_failed_email(email, name, cohort, score):
+    """Send an encouraging email when a participant fails their assessment."""
+    try:
+        context = {
+            "name": name,
+            "cohort": cohort,
+            "score": score,
+        }
+        message = render_to_string("cohort/assessment_failed_email.html", context)
+        subject = f"Your Web3Bridge Assessment Result – {cohort}"
+        from_email = getattr(settings, "ADMISSION_EMAIL_HOST_USER", "admission@web3bridge.com")
+
+        email_msg = EmailMessage(subject=subject, body=message, from_email=from_email, to=[email])
+        email_msg.content_subtype = "html"
+
+        if hasattr(settings, "ADMISSION_EMAIL_HOST_USER") and hasattr(settings, "ADMISSION_EMAIL_HOST_PASSWORD"):
+            from django.core.mail import get_connection
+            connection = get_connection(
+                host=getattr(settings, "ADMISSION_EMAIL_HOST", settings.EMAIL_HOST),
+                port=getattr(settings, "ADMISSION_EMAIL_PORT", settings.EMAIL_PORT),
+                username=getattr(settings, "ADMISSION_EMAIL_HOST_USER"),
+                password=getattr(settings, "ADMISSION_EMAIL_HOST_PASSWORD"),
+                use_tls=getattr(settings, "ADMISSION_EMAIL_USE_TLS", settings.EMAIL_USE_TLS),
+            )
+            email_msg.connection = connection
+
+        email_msg.send(fail_silently=False)
+    except Exception:
+        pass

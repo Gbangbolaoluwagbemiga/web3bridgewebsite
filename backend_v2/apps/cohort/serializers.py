@@ -365,6 +365,12 @@ class RescheduleAssessmentSerializer(serializers.Serializer):
     assessment_link = serializers.URLField()
 
 
+class SubmitAssessmentSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    score = serializers.DecimalField(max_digits=5, decimal_places=2)
+    passed = serializers.BooleanField()
+
+
 # Testimonial Serializer
 class TestimonialSerializer:
     class Create(serializers.ModelSerializer):
