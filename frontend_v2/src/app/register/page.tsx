@@ -14,6 +14,7 @@ import {
 import { buttonVariants } from "@/components/ui/button";
 import dynamic from "next/dynamic";
 import PaymentPendingModal from "@/components/shared/PaymentPendingModal";
+import SolidityAssessmentModal from "@/components/shared/SolidityAssessmentModal";
 
 // Types
 interface FormDataType {
@@ -65,6 +66,9 @@ export default function RegistrationPage() {
     paymentLink: string;
     participantId?: string;
   } | null>(null);
+
+  // Solidity Assessment Modal state
+  const [showSolidityModal, setShowSolidityModal] = useState(false);
 
   // Helper function to check if a course is ZK-related (strict, excludes Rust)
   async function getUserData(userForm: UserDataType) {
@@ -168,10 +172,8 @@ export default function RegistrationPage() {
         toast.dismiss(loadingToastId);
         
         if (courseName === "Solidity (Web3 Development)") {
-          toast.success("Registration successful! Redirecting to assessment...");
-          setTimeout(() => {
-            window.location.href = "https://assessment-incoming.vercel.app/";
-          }, 1000);
+          toast.success("Registration successful! Preparing your assessment options...");
+          setShowSolidityModal(true);
         } else {
           toast.success("Registration successful! Redirecting to payment...");
           const encodedData = btoa(JSON.stringify(userForm));
@@ -299,6 +301,12 @@ export default function RegistrationPage() {
           participantId={paymentModalData.participantId}
         />
       )}
+
+      <SolidityAssessmentModal
+        isOpen={showSolidityModal}
+        onClose={() => setShowSolidityModal(false)}
+        assessmentUrl="https://assessment-incoming.vercel.app/"
+      />
     </MaxWrapper>
   );
 }

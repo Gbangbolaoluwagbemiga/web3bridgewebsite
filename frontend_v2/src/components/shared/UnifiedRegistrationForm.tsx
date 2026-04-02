@@ -288,22 +288,29 @@ export default function UnifiedRegistrationForm({
 
               <div className="bg-gray-50 dark:bg-gray-900/50 rounded-2xl p-6 md:p-8 border border-gray-100 dark:border-gray-800 shadow-inner">
                 <div className="prose prose-sm dark:prose-invert max-w-none">
-                  {courseDetail.letter.split('\n').map((line, i) => (
-                    <p key={i} className="mb-4 text-gray-700 dark:text-gray-300 font-['Outfit'] leading-relaxed last:mb-0">
-                      {line}
-                    </p>
-                  ))}
+                  {courseDetail.letter.split('\n').map((line, i) => {
+                    const parts = line.split(/(\*\*.*?\*\*)/g);
+                    return (
+                      <p key={i} className="mb-4 text-gray-700 dark:text-gray-300 font-['Outfit'] leading-relaxed last:mb-0">
+                        {parts.map((part, index) => {
+                          if (part.startsWith('**') && part.endsWith('**')) {
+                            return <strong key={index} className="font-bold text-gray-900 dark:text-white">{part.slice(2, -2)}</strong>;
+                          }
+                          return part;
+                        })}
+                      </p>
+                    );
+                  })}
                 </div>
               </div>
 
               <div className="pt-4 space-y-6">
-                <div 
+                <label 
                   className={`flex items-start gap-4 p-5 rounded-2xl border-2 transition-all cursor-pointer ${
                     consentChecked 
                       ? "bg-red-50/40 border-bridgeRed shadow-md" 
                       : "bg-white dark:bg-gray-950 border-gray-100 dark:border-gray-800 hover:border-red-100"
                   }`}
-                  onClick={() => setConsentChecked(!consentChecked)}
                 >
                   <Checkbox 
                     id="consent" 
@@ -311,13 +318,12 @@ export default function UnifiedRegistrationForm({
                     onCheckedChange={(checked: boolean | "indeterminate") => setConsentChecked(checked === true)}
                     className="mt-1 w-5 h-5 border-gray-300 data-[state=checked]:bg-bridgeRed data-[state=checked]:border-bridgeRed transition-colors"
                   />
-                  <Label 
-                    htmlFor="consent" 
-                    className="text-sm font-bold text-gray-800 dark:text-gray-200 leading-tight cursor-pointer select-none"
-                  >
-                    I underscore that I have read and understood perfectly all the details and policies regarding this programme.
-                  </Label>
-                </div>
+                  <div className="space-y-1 select-none">
+                    <span className="text-sm font-bold text-gray-800 dark:text-gray-200 leading-tight">
+                      I underscore that I have read and understood perfectly all the details and policies regarding this programme.
+                    </span>
+                  </div>
+                </label>
 
                 <div className="flex justify-center">
                   <CustomButton
