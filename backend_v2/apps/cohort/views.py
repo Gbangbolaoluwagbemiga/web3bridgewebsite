@@ -627,7 +627,15 @@ class ParticipantViewSet(GuestReadAllWriteAdminOnlyPermissionMixin, viewsets.Vie
         cohort = serializer.validated_data["cohort"]
         assessment_link = serializer.validated_data["assessment_link"]
 
+        if models.AssessmentReschedule.objects.filter(email=email).exists():
+            return requestUtils.error_response(
+                "Assessment already rescheduled",
+                {"detail": "This participant has already rescheduled their assessment once. No further reschedules are allowed."},
+                http_status=status.HTTP_400_BAD_REQUEST,
+            )
+
         send_reschedule_assessment_email(email, name, cohort, assessment_link)
+        models.AssessmentReschedule.objects.create(email=email, cohort=cohort)
 
         return requestUtils.success_response(
             data={"message": f"Reschedule assessment email sent to {email}"},

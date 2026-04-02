@@ -251,7 +251,7 @@ class RegistrationEmailTemplateTests(SimpleTestCase):
 
 
 @override_settings(SECURE_SSL_REDIRECT=False)
-class RescheduleAssessmentEndpointTests(SimpleTestCase):
+class RescheduleAssessmentEndpointTests(TestCase):
     """
     Tests for POST /api/v2/cohort/participant/reschedule/
     No DB needed — the endpoint only validates input and sends an email.
@@ -339,6 +339,31 @@ class RescheduleAssessmentEndpointTests(SimpleTestCase):
 
         self.assertEqual(response.status_code, 400)
         mock_send.assert_not_called()
+
+    @patch("cohort.views.send_reschedule_assessment_email")
+    def test_second_reschedule_is_blocked(self, mock_send):
+        # First reschedule — should succeed
+        self.client.post(self.ENDPOINT, self.VALID_PAYLOAD, format="json")
+
+        # Second reschedule with same email — should be blocked
+        response = self.client.post(self.ENDPOINT, self.VALID_PAYLOAD, format="json")
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("already rescheduled", response.json()["message"].lower())
+        # Email sent only once (first request)
+        mock_send.assert_called_once()
+
+    @patch("cohort.views.send_reschedule_assessment_email")
+    def test_different_email_can_still_reschedule(self, mock_send):
+        # First participant reschedules
+        self.client.post(self.ENDPOINT, self.VALID_PAYLOAD, format="json")
+
+        # Different participant — should be allowed
+        different_payload = {**self.VALID_PAYLOAD, "email": "other@example.com"}
+        response = self.client.post(self.ENDPOINT, different_payload, format="json")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(mock_send.call_count, 2)
 
 
 class RescheduleAssessmentTemplateTests(SimpleTestCase):
