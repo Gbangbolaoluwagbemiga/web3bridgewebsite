@@ -131,7 +131,7 @@ class CheckIn(BaseModelBaseMixin, models.Model):
             # Common admin filters: status + time range / ordering
             models.Index(
                 fields=['status', 'check_in_time'],
-                name='checkin_status_checkin_time_idx',
+                name='checkin_status_time_idx',
             ),
         ]
         ordering = ['-check_in_time']
