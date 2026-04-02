@@ -174,7 +174,7 @@ export default function RegistrationPage() {
         await getUserData(userForm);
         toast.dismiss(loadingToastId);
         
-        if (courseName.toLowerCase().includes("solidity")) {
+        if (courseName === "Solidity (Web3 Development)") {
           toast.success("Registration successful! Redirecting to assessment...");
           setTimeout(() => {
             window.location.href = "https://assessment-incoming.vercel.app/";
