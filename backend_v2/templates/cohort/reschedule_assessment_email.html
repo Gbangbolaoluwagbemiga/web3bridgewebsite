@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Assessment Rescheduled – Web3Bridge</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f8f9fa;
+            color: #333;
+            margin: 0;
+            padding: 0;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 30px 20px;
+            background-color: #fff;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+
+        p {
+            line-height: 1.6;
+            margin-bottom: 15px;
+        }
+
+        .deadline {
+            font-weight: bold;
+            color: #d9534f;
+        }
+
+        .btn {
+            display: inline-block;
+            margin: 20px 0;
+            padding: 14px 28px;
+            background-color: #007bff;
+            color: #ffffff !important;
+            text-decoration: none;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: bold;
+        }
+
+        .btn:hover {
+            background-color: #0056b3;
+        }
+
+        .footer {
+            margin-top: 30px;
+            font-size: 13px;
+            color: #666;
+        }
+
+        a {
+            color: #007bff;
+            text-decoration: none;
+        }
+
+        a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <p>Dear {{ name }},</p>
+
+        <p>We wanted to let you know that your assessment for the <strong>{{ cohort }}</strong> program has been
+            <strong>rescheduled</strong>.</p>
+
+        <p>You now have <span class="deadline">3 days</span> from the receipt of this email to complete your assessment.
+            Please make sure your device and internet connection are ready before you begin.</p>
+
+        <p>Click the button below to start your assessment:</p>
+
+        <a href="{{ assessment_link }}" class="btn" target="_blank" rel="noopener">Take Your Assessment</a>
+
+        <p>If the button above doesn't work, copy and paste the link below into your browser:</p>
+        <p><a href="{{ assessment_link }}">{{ assessment_link }}</a></p>
+
+        <p>If you have any questions or need support, reach out to us on
+            <a href="https://t.me/web3bridge">Telegram</a> or
+            <a href="https://twitter.com/Web3Bridge">Twitter</a>.
+        </p>
+
+        <p>With Love,</p>
+        <p>Ayodeji Awosika<br />Founder, Web3Bridge</p>
+
+        <div class="footer">
+            <a href="https://www.web3bridge.com" target="_blank" rel="noopener">www.web3bridge.com</a>
+        </div>
+    </div>
+</body>
+
+</html>

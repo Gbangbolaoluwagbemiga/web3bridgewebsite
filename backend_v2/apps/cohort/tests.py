@@ -1,8 +1,10 @@
 from unittest.mock import Mock, patch
 
 import requests
-from django.test import SimpleTestCase, override_settings
+from django.test import SimpleTestCase, TestCase, override_settings
 from django.template.loader import render_to_string
+from django.urls import reverse
+from rest_framework.test import APIClient
 
 from .helpers.portal import (
     create_portal_onboarding_invite,
@@ -246,3 +248,133 @@ class RegistrationEmailTemplateTests(SimpleTestCase):
 
         self.assertIsNone(activation_url)
         self.assertEqual(mock_post.call_count, 1)
+
+
+@override_settings(SECURE_SSL_REDIRECT=False)
+class RescheduleAssessmentEndpointTests(SimpleTestCase):
+    """
+    Tests for POST /api/v2/cohort/participant/reschedule/
+    No DB needed — the endpoint only validates input and sends an email.
+    Email sending is mocked so no real SMTP calls are made.
+    """
+
+    ENDPOINT = "/api/v2/cohort/participant/reschedule/"
+
+    VALID_PAYLOAD = {
+        "email": "student@example.com",
+        "name": "John Doe",
+        "cohort": "Web3 Cohort XIV",
+        "assessment_link": "https://calendly.com/web3bridge/assessment",
+    }
+
+    def setUp(self):
+        self.client = APIClient()
+
+    @patch("cohort.views.send_reschedule_assessment_email")
+    def test_valid_request_returns_200_and_sends_email(self, mock_send):
+        response = self.client.post(self.ENDPOINT, self.VALID_PAYLOAD, format="json")
+
+        self.assertEqual(response.status_code, 200)
+        mock_send.assert_called_once_with(
+            "student@example.com",
+            "John Doe",
+            "Web3 Cohort XIV",
+            "https://calendly.com/web3bridge/assessment",
+        )
+
+    @patch("cohort.views.send_reschedule_assessment_email")
+    def test_response_contains_success_message(self, mock_send):
+        response = self.client.post(self.ENDPOINT, self.VALID_PAYLOAD, format="json")
+
+        self.assertIn("email sent", response.json()["data"]["message"].lower())
+
+    @patch("cohort.views.send_reschedule_assessment_email")
+    def test_missing_email_returns_400(self, mock_send):
+        payload = {**self.VALID_PAYLOAD}
+        payload.pop("email")
+        response = self.client.post(self.ENDPOINT, payload, format="json")
+
+        self.assertEqual(response.status_code, 400)
+        mock_send.assert_not_called()
+
+    @patch("cohort.views.send_reschedule_assessment_email")
+    def test_missing_name_returns_400(self, mock_send):
+        payload = {**self.VALID_PAYLOAD}
+        payload.pop("name")
+        response = self.client.post(self.ENDPOINT, payload, format="json")
+
+        self.assertEqual(response.status_code, 400)
+        mock_send.assert_not_called()
+
+    @patch("cohort.views.send_reschedule_assessment_email")
+    def test_missing_cohort_returns_400(self, mock_send):
+        payload = {**self.VALID_PAYLOAD}
+        payload.pop("cohort")
+        response = self.client.post(self.ENDPOINT, payload, format="json")
+
+        self.assertEqual(response.status_code, 400)
+        mock_send.assert_not_called()
+
+    @patch("cohort.views.send_reschedule_assessment_email")
+    def test_missing_assessment_link_returns_400(self, mock_send):
+        payload = {**self.VALID_PAYLOAD}
+        payload.pop("assessment_link")
+        response = self.client.post(self.ENDPOINT, payload, format="json")
+
+        self.assertEqual(response.status_code, 400)
+        mock_send.assert_not_called()
+
+    @patch("cohort.views.send_reschedule_assessment_email")
+    def test_invalid_email_returns_400(self, mock_send):
+        payload = {**self.VALID_PAYLOAD, "email": "not-an-email"}
+        response = self.client.post(self.ENDPOINT, payload, format="json")
+
+        self.assertEqual(response.status_code, 400)
+        mock_send.assert_not_called()
+
+    @patch("cohort.views.send_reschedule_assessment_email")
+    def test_invalid_assessment_link_returns_400(self, mock_send):
+        payload = {**self.VALID_PAYLOAD, "assessment_link": "not-a-url"}
+        response = self.client.post(self.ENDPOINT, payload, format="json")
+
+        self.assertEqual(response.status_code, 400)
+        mock_send.assert_not_called()
+
+
+class RescheduleAssessmentTemplateTests(SimpleTestCase):
+    """Verify the email template renders all key content correctly."""
+
+    TEMPLATE = "cohort/reschedule_assessment_email.html"
+
+    def test_template_renders_student_name(self):
+        rendered = render_to_string(self.TEMPLATE, {
+            "name": "John Doe",
+            "cohort": "Web3 Cohort XIV",
+            "assessment_link": "https://calendly.com/web3bridge/assessment",
+        })
+        self.assertIn("John Doe", rendered)
+
+    def test_template_renders_cohort(self):
+        rendered = render_to_string(self.TEMPLATE, {
+            "name": "John Doe",
+            "cohort": "Web3 Cohort XIV",
+            "assessment_link": "https://calendly.com/web3bridge/assessment",
+        })
+        self.assertIn("Web3 Cohort XIV", rendered)
+
+    def test_template_renders_assessment_link(self):
+        link = "https://calendly.com/web3bridge/assessment"
+        rendered = render_to_string(self.TEMPLATE, {
+            "name": "John Doe",
+            "cohort": "Web3 Cohort XIV",
+            "assessment_link": link,
+        })
+        self.assertIn(link, rendered)
+
+    def test_template_mentions_3_days(self):
+        rendered = render_to_string(self.TEMPLATE, {
+            "name": "John Doe",
+            "cohort": "Web3 Cohort XIV",
+            "assessment_link": "https://calendly.com/web3bridge/assessment",
+        })
+        self.assertIn("3 days", rendered)
