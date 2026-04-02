@@ -9,6 +9,8 @@ import { Loader2, MoveRight, MoveLeft, Globe, MapPin, CheckCircle2 } from "lucid
 import { toast } from "sonner";
 import { useFetchAllCourses } from "@/hooks";
 import { unifiedRegistrationSchema } from "@/lib/validators";
+import { COURSE_DETAILS } from "@/lib/course-constants";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Form,
   FormControl,
@@ -56,6 +58,8 @@ export default function UnifiedRegistrationForm({
   const [expandedDescriptions, setExpandedDescriptions] = useState<{ [key: string]: boolean }>({});
   const [showZKModal, setShowZKModal] = useState(false);
   const [countryCode, setCountryCode] = useState<string>("");
+  const [hasConsented, setHasConsented] = useState(false);
+  const [consentChecked, setConsentChecked] = useState(false);
 
   const form = useForm<z.infer<typeof unifiedRegistrationSchema>>({
     resolver: zodResolver(unifiedRegistrationSchema),
@@ -78,6 +82,17 @@ export default function UnifiedRegistrationForm({
     if (!courses || !selectedCourseName) return null;
     return courses.find((c: any) => c.name === selectedCourseName);
   }, [courses, selectedCourseName]);
+
+  const courseDetail = useMemo(() => {
+    if (!selectedCourseName) return null;
+    return COURSE_DETAILS[selectedCourseName] || null;
+  }, [selectedCourseName]);
+
+  // Reset consent when course changes
+  useEffect(() => {
+    setHasConsented(false);
+    setConsentChecked(false);
+  }, [selectedCourseName]);
 
   // Sync errorMessage from parent
   useEffect(() => {
@@ -252,8 +267,80 @@ export default function UnifiedRegistrationForm({
             </div>
           )}
 
-          {/* Section 2: Personal Details (Revealed after selection) */}
-          {selectedCourseName && (
+          {/* New Section: Course Detail & Consent */}
+          {selectedCourseName && !hasConsented && courseDetail && (
+            <div className="space-y-6 pt-2 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <div className="flex items-center justify-between mb-4 border-b pb-4 shadow-sm">
+                <button
+                  type="button"
+                  onClick={() => form.setValue("course", "")}
+                  className="text-sm font-medium text-gray-500 hover:text-bridgeRed flex items-center gap-1 transition-colors group"
+                >
+                  <MoveLeft className="w-4 h-4 transition-transform group-hover:-translate-x-1" /> Change Course
+                </button>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Registration Fee</span>
+                  <div className="text-sm font-black text-bridgeRed bg-red-50 border border-red-100 px-3 py-1 rounded-full">
+                    {courseDetail.price}
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-gray-50 dark:bg-gray-900/50 rounded-2xl p-6 md:p-8 border border-gray-100 dark:border-gray-800 shadow-inner">
+                <div className="prose prose-sm dark:prose-invert max-w-none">
+                  {courseDetail.letter.split('\n').map((line, i) => {
+                    const parts = line.split(/(\*\*.*?\*\*)/g);
+                    return (
+                      <p key={i} className="mb-4 text-gray-700 dark:text-gray-300 font-['Outfit'] leading-relaxed last:mb-0">
+                        {parts.map((part, index) => {
+                          if (part.startsWith('**') && part.endsWith('**')) {
+                            return <strong key={index} className="font-bold text-gray-900 dark:text-white">{part.slice(2, -2)}</strong>;
+                          }
+                          return part;
+                        })}
+                      </p>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="pt-4 space-y-6">
+                <label 
+                  className={`flex items-start gap-4 p-5 rounded-2xl border-2 transition-all cursor-pointer ${
+                    consentChecked 
+                      ? "bg-red-50/40 border-bridgeRed shadow-md" 
+                      : "bg-white dark:bg-gray-950 border-gray-100 dark:border-gray-800 hover:border-red-100"
+                  }`}
+                >
+                  <Checkbox 
+                    id="consent" 
+                    checked={consentChecked}
+                    onCheckedChange={(checked: boolean | "indeterminate") => setConsentChecked(checked === true)}
+                    className="mt-1 w-5 h-5 border-gray-300 data-[state=checked]:bg-bridgeRed data-[state=checked]:border-bridgeRed transition-colors"
+                  />
+                  <div className="space-y-1 select-none">
+                    <span className="text-sm font-bold text-gray-800 dark:text-gray-200 leading-tight">
+                      I underscore that I have read and understood perfectly all the details and policies regarding this programme.
+                    </span>
+                  </div>
+                </label>
+
+                <div className="flex justify-center">
+                  <CustomButton
+                    type="button"
+                    onClick={() => setHasConsented(true)}
+                    disabled={!consentChecked}
+                    className="w-full max-w-[340px] h-14 text-base font-black bg-bridgeRed hover:bg-bridgeRed/90 text-white rounded-full transition-all hover:scale-[1.02] active:scale-[0.98] shadow-xl shadow-bridgeRed/20 disabled:opacity-50 disabled:grayscale disabled:scale-100 uppercase tracking-wide"
+                  >
+                    Continue to Registration <MoveRight className="w-5 h-5 ml-2" />
+                  </CustomButton>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Section 2: Personal Details (Revealed after selection and consent) */}
+          {selectedCourseName && hasConsented && (
             <div className="space-y-6 pt-6 font-['Outfit'] animate-in fade-in slide-in-from-top-4 duration-500 fill-mode-forwards">
               <div className="flex items-center justify-between mb-4 border-b pb-4">
                 <button

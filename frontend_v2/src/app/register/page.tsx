@@ -14,6 +14,7 @@ import {
 import { buttonVariants } from "@/components/ui/button";
 import dynamic from "next/dynamic";
 import PaymentPendingModal from "@/components/shared/PaymentPendingModal";
+import SolidityAssessmentModal from "@/components/shared/SolidityAssessmentModal";
 
 // Types
 interface FormDataType {
@@ -66,14 +67,10 @@ export default function RegistrationPage() {
     participantId?: string;
   } | null>(null);
 
-  // Helper function to check if a course is ZK-related (strict, excludes Rust)
-  const isZKCourse = (courseName: string) => {
-    const name = courseName.toLowerCase();
-    const isZK = name.includes('zk') || name.includes('zero knowledge') || name.includes('zero-knowledge');
-    const isRust = name.includes('rust');
-    return isZK && !isRust;
-  };
+  // Solidity Assessment Modal state
+  const [showSolidityModal, setShowSolidityModal] = useState(false);
 
+  // Helper function to check if a course is ZK-related (strict, excludes Rust)
   async function getUserData(userForm: UserDataType) {
     const response = await fetch(
       `${process.env.NEXT_PUBLIC_BASE_URL}/cohort/participant/`,
@@ -174,9 +171,9 @@ export default function RegistrationPage() {
         await getUserData(userForm);
         toast.dismiss(loadingToastId);
         
-        if (isZKCourse(courseName)) {
-          toast.success("Registration submitted successfully! Our team will review your application.");
-          setIsRegistered(true);
+        if (courseName === "Solidity (Web3 Development)") {
+          toast.success("Registration successful! Preparing your assessment options...");
+          setShowSolidityModal(true);
         } else {
           toast.success("Registration successful! Redirecting to payment...");
           const encodedData = btoa(JSON.stringify(userForm));
@@ -304,6 +301,12 @@ export default function RegistrationPage() {
           participantId={paymentModalData.participantId}
         />
       )}
+
+      <SolidityAssessmentModal
+        isOpen={showSolidityModal}
+        onClose={() => setShowSolidityModal(false)}
+        assessmentUrl="https://assessment-incoming.vercel.app/"
+      />
     </MaxWrapper>
   );
 }
