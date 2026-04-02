@@ -67,13 +67,6 @@ export default function RegistrationPage() {
   } | null>(null);
 
   // Helper function to check if a course is ZK-related (strict, excludes Rust)
-  const isZKCourse = (courseName: string) => {
-    const name = courseName.toLowerCase();
-    const isZK = name.includes('zk') || name.includes('zero knowledge') || name.includes('zero-knowledge');
-    const isRust = name.includes('rust');
-    return isZK && !isRust;
-  };
-
   async function getUserData(userForm: UserDataType) {
     const response = await fetch(
       `${process.env.NEXT_PUBLIC_BASE_URL}/cohort/participant/`,
