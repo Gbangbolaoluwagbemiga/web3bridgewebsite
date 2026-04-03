@@ -767,8 +767,18 @@ class ParticipantViewSet(GuestReadAllWriteAdminOnlyPermissionMixin, viewsets.Vie
 
     def destroy(self, request, pk, *args, **kwargs):
         participant_object = self.get_queryset().get(pk=pk)
+
+        # Nullify the DB-level FK in payment table before deleting.
+        # payment.registration_id references cohort_participant.id but is not
+        # managed by Django, so raw SQL is required to preserve payment records.
+        from django.db import connection
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "UPDATE payment SET registration_id = NULL WHERE registration_id = %s",
+                [participant_object.pk],
+            )
+
         participant_object.delete()
-        # Invalidate cache when participant is deleted
         invalidate_participant_cache()
         return requestUtils.success_response(data={}, http_status=status.HTTP_200_OK)
 
