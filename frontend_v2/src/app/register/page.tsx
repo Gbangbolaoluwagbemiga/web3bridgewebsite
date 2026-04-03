@@ -71,7 +71,7 @@ export default function RegistrationPage() {
   const [showSolidityModal, setShowSolidityModal] = useState(false);
 
   // Helper function to check if a course is ZK-related (strict, excludes Rust)
-  async function getUserData(userForm: UserDataType) {
+  async function getUserData(userForm: UserDataType, courseName: string) {
     const response = await fetch(
       `${process.env.NEXT_PUBLIC_BASE_URL}/cohort/participant/`,
       {
@@ -87,6 +87,10 @@ export default function RegistrationPage() {
       const data = await response.json();
 
       if (data.errors && data.errors.email && typeof data.errors.email === 'object' && data.errors.email.already_registered_unpaid) {
+        if (courseName === "Solidity (Web3 Development)") {
+          throw new Error("You have already registered for this course. Please check your email for assessment instructions.");
+        }
+        
         setPaymentModalData({
           message: data.errors.email.message,
           paymentLink: data.errors.email.payment_link,
@@ -168,7 +172,7 @@ export default function RegistrationPage() {
       localStorage.setItem("regData", JSON.stringify(userForm));
 
       try {
-        await getUserData(userForm);
+        await getUserData(userForm, courseName);
         toast.dismiss(loadingToastId);
         
         if (courseName === "Solidity (Web3 Development)") {
@@ -306,6 +310,8 @@ export default function RegistrationPage() {
         isOpen={showSolidityModal}
         onClose={() => setShowSolidityModal(false)}
         assessmentUrl="https://assessment-incoming.vercel.app/"
+        studentName={formData?.name}
+        studentEmail={formData?.email}
       />
     </MaxWrapper>
   );
