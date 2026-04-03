@@ -15,12 +15,13 @@ def testimonial_image_location(instance, filename):
     return f"{settings.ENVIROMENT}/Testimonial/{full_name_processed}/{filename}"
 
 
-def send_registration_success_mail(email, course_id, participant):
+def send_registration_success_mail(email, course_id, participant, activation_url=None):
     from cohort.models import Course
 
     try:
         course = Course.objects.get(pk=course_id)
         name_lc = (course.name or "").lower()
+        is_zk = bool(re.search(r"\bzk\b|\bzero[- ]?knowledge\b", name_lc))
 
         # Prioritize Rust, then Web2/Web3. Explicitly guard ZK from matching others.
         if re.search(r"\brust\b", name_lc):
@@ -32,7 +33,7 @@ def send_registration_success_mail(email, course_id, participant):
         elif re.search(r"\bweb3\b", name_lc):
             subject = "Web3 Registration Success"
             template_name = "cohort/web3_registration_email.html"
-        elif re.search(r"\bzk\b|\bzero[- ]?knowledge\b", name_lc):
+        elif is_zk:
             subject = "🎉 Welcome to the Web3Bridge Zero Knowledge Program!"
             template_name = "cohort/zk_registration_email.html"
         else:
@@ -41,6 +42,7 @@ def send_registration_success_mail(email, course_id, participant):
 
         context = {
             "name": participant,
+            "activation_url": None if is_zk else activation_url,
         }
         message = render_to_string(template_name, context)
 

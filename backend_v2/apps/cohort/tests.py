@@ -1,4 +1,4 @@
-from unittest.mock import Mock, patch
+from unittest.mock import MagicMock, Mock, patch
 
 import requests
 from django.test import SimpleTestCase, TestCase, override_settings
@@ -504,6 +504,92 @@ class SubmitAssessmentEndpointTests(TestCase):
 
         self.assertEqual(response.status_code, 400)
         mock_passed.assert_not_called()
+
+
+class PaymentActivationEmailTests(SimpleTestCase):
+    """
+    Verify that after a successful payment, the portal activation URL
+    is fetched and passed into the registration success email for non-ZK students.
+    ZK students must NOT receive the activation URL.
+    """
+
+    @patch("cohort.helpers.model.base.render_to_string")
+    @patch("cohort.helpers.model.base.EmailMessage")
+    @patch("cohort.views.create_portal_onboarding_invite")
+    def test_activation_url_passed_to_email_for_web3_course(
+        self, mock_invite, mock_email_cls, mock_render
+    ):
+        mock_invite.return_value = "https://portal.web3bridge.com/activate/onboard?token=abc"
+        mock_render.return_value = "<html></html>"
+        mock_email_cls.return_value = MagicMock()
+
+        with patch("cohort.models.Course") as mock_course_cls:
+            mock_course = MagicMock()
+            mock_course.name = "Web3 Development"
+            mock_course_cls.objects.get.return_value = mock_course
+
+            from cohort.helpers.model.base import send_registration_success_mail
+            send_registration_success_mail(
+                "student@example.com", 1, "John Doe",
+                activation_url="https://portal.web3bridge.com/activate/onboard?token=abc"
+            )
+
+        call_kwargs = mock_render.call_args
+        context = call_kwargs[0][1]
+        self.assertEqual(
+            context.get("activation_url"),
+            "https://portal.web3bridge.com/activate/onboard?token=abc"
+        )
+
+    @patch("cohort.helpers.model.base.render_to_string")
+    @patch("cohort.helpers.model.base.EmailMessage")
+    def test_activation_url_is_none_for_zk_course(self, mock_email_cls, mock_render):
+        mock_render.return_value = "<html></html>"
+        mock_email_cls.return_value = MagicMock()
+
+        with patch("cohort.models.Course") as mock_course_cls:
+            mock_course = MagicMock()
+            mock_course.name = "ZK Cohort XIV"
+            mock_course_cls.objects.get.return_value = mock_course
+
+            from cohort.helpers.model.base import send_registration_success_mail
+            send_registration_success_mail(
+                "zk@example.com", 1, "ZK Student",
+                activation_url="https://portal.web3bridge.com/activate/onboard?token=zk"
+            )
+
+        call_kwargs = mock_render.call_args
+        context = call_kwargs[0][1]
+        self.assertIsNone(context.get("activation_url"))
+
+    @patch("cohort.views.send_registration_success_mail")
+    @patch("cohort.views.send_participant_details")
+    @patch("cohort.views.create_portal_onboarding_invite")
+    def test_handle_payment_success_calls_portal_invite(
+        self, mock_invite, mock_details, mock_mail
+    ):
+        from cohort.views import handle_payment_success
+        from unittest.mock import MagicMock
+
+        mock_invite.return_value = "https://portal.web3bridge.com/activate/onboard?token=xyz"
+
+        participant = MagicMock()
+        serialized = {
+            "email": "student@example.com",
+            "name": "John Doe",
+            "course": {"id": 1},
+        }
+        serializer_class = MagicMock()
+
+        handle_payment_success(participant, serialized, serializer_class)
+
+        # Portal invite must be called with the participant object
+        mock_invite.assert_called_once_with(participant)
+        # Mail must be called with the activation_url
+        mock_mail.assert_called_once_with(
+            "student@example.com", 1, "John Doe",
+            activation_url="https://portal.web3bridge.com/activate/onboard?token=xyz"
+        )
 
 
 class SubmitAssessmentTemplateTests(SimpleTestCase):

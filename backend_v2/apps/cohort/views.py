@@ -21,6 +21,7 @@ from .helpers.model import (
     send_registration_success_mail,
     send_reschedule_assessment_email,
 )
+from .helpers.portal import create_portal_onboarding_invite
 from backend_v2.scripts.mail import send_bulk_email
 from payment.models import DiscountCode, Payment
 from utils.enums.models import RegistrationStatus
@@ -56,7 +57,10 @@ def handle_payment_success(
     participant_name = serialized_participant_obj.get("name")
     course_id = serialized_participant_obj.get("course").get("id")
 
-    send_registration_success_mail(email, course_id, participant_name)
+    # Get portal activation URL for non-ZK students
+    activation_url = create_portal_onboarding_invite(participant_object)
+
+    send_registration_success_mail(email, course_id, participant_name, activation_url=activation_url)
     send_participant_details(email, course_id, serialized_participant_obj)
     return serializer_class.Retrieve(participant_object).data
 
@@ -300,6 +304,7 @@ class ParticipantViewSet(GuestReadAllWriteAdminOnlyPermissionMixin, viewsets.Vie
         "destroy",
         "send_confirmation_email",
         "approve",
+        "paid_per_cohort",
     ]
 
     def get_queryset(self):
@@ -608,6 +613,25 @@ class ParticipantViewSet(GuestReadAllWriteAdminOnlyPermissionMixin, viewsets.Vie
         return requestUtils.success_response(
             data=serialized_participant_obj, http_status=status.HTTP_200_OK
         )
+
+    @decorators.action(detail=False, methods=["get"], url_path="paid")
+    def paid_per_cohort(self, request, *args, **kwargs):
+        """
+        Fetch all participants that have paid, filtered by cohort.
+        Requires admin auth token.
+        Query param: ?cohort=Web3 Cohort XIV
+        """
+        cohort = request.query_params.get("cohort")
+        if not cohort:
+            return requestUtils.error_response(
+                "cohort query parameter is required",
+                {},
+                http_status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        queryset = self.get_queryset().filter(cohort=cohort, payment_status=True)
+        serializer = self.serializer_class.List(queryset, many=True)
+        return requestUtils.success_response(data=serializer.data, http_status=status.HTTP_200_OK)
 
     @swagger_auto_schema(request_body=serializers.RescheduleAssessmentSerializer)
     @decorators.action(detail=False, methods=["post"], url_path="reschedule")
