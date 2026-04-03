@@ -1,6 +1,8 @@
 "use client";
 
-import React from "react";
+/* eslint-disable react/no-unescaped-entities */
+
+import { useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -9,29 +11,65 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { ClipboardCheck, Clock, Smartphone, MoveRight, Calendar } from "lucide-react";
+import { ClipboardCheck, Clock, Smartphone, MoveRight, Calendar, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 interface SolidityAssessmentModalProps {
   isOpen: boolean;
   onClose: () => void;
   assessmentUrl: string;
+  studentEmail?: string;
+  studentName?: string;
 }
 
 export default function SolidityAssessmentModal({
   isOpen,
   onClose,
   assessmentUrl,
+  studentEmail,
+  studentName,
 }: SolidityAssessmentModalProps) {
+  const [isRescheduling, setIsRescheduling] = useState(false);
+
   const handleStartNow = () => {
     toast.success("Redirecting to your assessment...");
     window.location.href = assessmentUrl;
   };
 
-  const handleReschedule = () => {
-    // Placeholder for reschedule logic
-    toast.info("Your request to reschedule has been noted. We'll follow up with you shortly via email.");
-    onClose();
+  const handleReschedule = async () => {
+    // Basic validation
+    if (!studentEmail || !studentName) {
+      toast.error("Missing student information to process reschedule.");
+      return;
+    }
+
+    try {
+      setIsRescheduling(true);
+      const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/cohort/participant/reschedule/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: studentEmail,
+          name: studentName,
+          cohort: "Web3 Cohort XIV",
+          assessment_link: assessmentUrl,
+        }),
+      });
+
+      if (!res.ok) {
+        throw new Error("Failed to submit reschedule request.");
+      }
+
+      toast.success("Your request to reschedule has been successfully submitted. We'll follow up with you via email.");
+      setTimeout(() => {
+        window.location.href = "/";
+      }, 1500);
+    } catch (err) {
+      toast.error("An error occurred while rescheduling. Please try again or contact support.");
+      console.error("Reschedule Error:", err);
+    } finally {
+      setIsRescheduling(false);
+    }
   };
 
   return (
@@ -98,13 +136,23 @@ export default function SolidityAssessmentModal({
             <Button
               variant="outline"
               onClick={handleReschedule}
-              className="flex-1 h-14 rounded-full border-2 font-bold text-gray-600 hover:text-gray-900 hover:bg-gray-50 transition-all active:scale-95 group"
+              disabled={isRescheduling}
+              className="flex-1 h-14 rounded-full border-2 font-bold text-gray-600 hover:text-gray-900 hover:bg-gray-50 transition-all active:scale-95 group disabled:opacity-70 disabled:pointer-events-none"
             >
-              <Calendar className="w-5 h-5 mr-2 transition-transform group-hover:scale-110" /> Reschedule Later
+              {isRescheduling ? (
+                <>
+                  <Loader2 className="w-5 h-5 mr-2 animate-spin" /> Processing...
+                </>
+              ) : (
+                <>
+                  <Calendar className="w-5 h-5 mr-2 transition-transform group-hover:scale-110" /> Reschedule Later
+                </>
+              )}
             </Button>
             <Button
               onClick={handleStartNow}
-              className="flex-[1.5] h-14 bg-bridgeRed hover:bg-bridgeRed/90 text-white rounded-full font-bold shadow-lg shadow-red-500/20 transition-all hover:scale-[1.02] active:scale-[0.98] group"
+              disabled={isRescheduling}
+              className="flex-[1.5] h-14 bg-bridgeRed hover:bg-bridgeRed/90 text-white rounded-full font-bold shadow-lg shadow-red-500/20 transition-all hover:scale-[1.02] active:scale-[0.98] group disabled:opacity-70 disabled:pointer-events-none"
             >
               Start Assessment Now <MoveRight className="w-5 h-5 ml-2 transition-transform group-hover:translate-x-1" />
             </Button>
