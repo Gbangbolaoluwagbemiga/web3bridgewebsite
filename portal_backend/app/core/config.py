@@ -71,7 +71,7 @@ class Settings(BaseSettings):
         default="change-me-internal-key",
         validation_alias=AliasChoices("INTERNAL_API_KEY", "PAYMENT_API_KEY"),
     )
-    PORTAL_FRONTEND_URL: str = "http://localhost:3000"
+    PORTAL_FRONTEND_URL: str = "https://portal.web3bridge.com"
 
     EMAIL_HOST: str = Field(default="smtp.gmail.com")
     EMAIL_PORT: int = Field(default=587)

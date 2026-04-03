@@ -48,7 +48,7 @@ class OnboardingService:
     @staticmethod
     def build_activation_url(token: str) -> str:
         query = urlencode({"token": token})
-        return f"{settings.PORTAL_FRONTEND_URL.rstrip('/')}/activate?{query}"
+        return f"{settings.PORTAL_FRONTEND_URL.rstrip('/')}/activate/onboard?{query}"
 
     @staticmethod
     def should_issue_activation_invite(*, portal_invite_created: bool, account_state: str) -> bool:
