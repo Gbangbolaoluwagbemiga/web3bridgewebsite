@@ -27,6 +27,8 @@ interface FormDataType {
   course: string;
   venue?: string;
   registration?: string;
+  /** Shown on UnifiedRegistrationForm; sent to Participant create as `gender`. */
+  gender: string;
 }
 
 interface UserDataType extends FormDataType {
@@ -162,7 +164,7 @@ export default function RegistrationPage() {
         // BACKEND COMPATIBILITY: Inject defaults for fields not in the simplified UI
         wallet_address: (values as any).wallet_address || "0x0000000000000000000000000000000000000000",
         city: values.state, // Default city to state name
-        gender: "other", 
+        gender: values.gender,
         motivation: "Enrolled through simplified unified form",
         achievement: "Enrolled through simplified unified form",
         github: values.github || (courseName.toLowerCase().includes("beginner") ? "https://github.com/web3bridge" : ""),

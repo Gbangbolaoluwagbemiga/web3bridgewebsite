@@ -80,7 +80,13 @@ class Participant(BaseModelBaseMixin, models.Model):
     city = models.CharField(_("city name"), max_length=50, blank=False, null=True)
     state = models.CharField(_("state name"), max_length=50, blank=False, null=True)
     country = models.CharField(_("country name"), max_length=50, blank=False, null=True)
-    gender = models.CharField(_("gender"), max_length=20, blank=False, null=True)
+    gender = models.CharField(
+        _("gender"),
+        max_length=20,
+        blank=False,
+        null=True,
+        help_text="Collected on the registration form (e.g. male, female, other); exposed via Participant create API.",
+    )
     github = models.URLField(_("github url"), max_length=250, blank=True, default="")
     number = models.CharField(_("phone number"), max_length=20, blank=False, null=True)
     course = models.ForeignKey(Course, on_delete=models.SET_NULL, null=True)

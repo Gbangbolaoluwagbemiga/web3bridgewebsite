@@ -72,6 +72,7 @@ export default function UnifiedRegistrationForm({
       country: formData?.country || "",
       state: formData?.state || "",
       venue: formData?.venue || "",
+      gender: formData?.gender || "male",
     },
   });
 
@@ -530,6 +531,49 @@ export default function UnifiedRegistrationForm({
                           ))}
                         </SelectContent>
                       </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="gender"
+                  render={({ field }) => (
+                    <FormItem className="md:col-span-2">
+                      <FormLabel>Gender</FormLabel>
+                      <FormControl>
+                        <RadioGroup
+                          onValueChange={field.onChange}
+                          value={field.value}
+                          className="flex flex-wrap gap-6 pt-1"
+                        >
+                          <FormItem className="flex items-center space-x-2 space-y-0">
+                            <FormControl>
+                              <RadioGroupItem value="male" id="gender-male" className="border-bridgeRed text-bridgeRed" />
+                            </FormControl>
+                            <Label htmlFor="gender-male" className="font-normal cursor-pointer">
+                              Male
+                            </Label>
+                          </FormItem>
+                          <FormItem className="flex items-center space-x-2 space-y-0">
+                            <FormControl>
+                              <RadioGroupItem value="female" id="gender-female" className="border-bridgeRed text-bridgeRed" />
+                            </FormControl>
+                            <Label htmlFor="gender-female" className="font-normal cursor-pointer">
+                              Female
+                            </Label>
+                          </FormItem>
+                          <FormItem className="flex items-center space-x-2 space-y-0">
+                            <FormControl>
+                              <RadioGroupItem value="other" id="gender-other" className="border-bridgeRed text-bridgeRed" />
+                            </FormControl>
+                            <Label htmlFor="gender-other" className="font-normal cursor-pointer">
+                              Prefer not to say / Other
+                            </Label>
+                          </FormItem>
+                        </RadioGroup>
+                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
