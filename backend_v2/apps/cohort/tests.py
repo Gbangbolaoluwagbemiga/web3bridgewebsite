@@ -454,6 +454,24 @@ class SubmitAssessmentEndpointTests(TestCase):
         self.assertTrue(Assessment.objects.filter(participant=self.participant, passed=True).exists())
         mock_passed.assert_called_once()
 
+    @patch("cohort.views.send_assessment_passed_email")
+    def test_breakdown_persisted_and_passed_to_email(self, mock_passed):
+        breakdown = {"logic": 40, "solidity": 45}
+        payload = {
+            "email": "john@example.com",
+            "score": "85.50",
+            "passed": True,
+            "breakdown": breakdown,
+        }
+        response = self._post(payload)
+
+        self.assertEqual(response.status_code, 201)
+        from cohort.models import Assessment
+        a = Assessment.objects.get(participant=self.participant)
+        self.assertEqual(a.breakdown, breakdown)
+        mock_passed.assert_called_once()
+        self.assertEqual(mock_passed.call_args.kwargs.get("breakdown"), breakdown)
+
     @patch("cohort.views.send_assessment_failed_email")
     def test_fail_creates_assessment_and_sends_failed_email(self, mock_failed):
         payload = {"email": "john@example.com", "score": "40.00", "passed": False}
@@ -601,17 +619,40 @@ class SubmitAssessmentTemplateTests(SimpleTestCase):
             "cohort": "Web3 Cohort XIV",
             "score": "85.50",
             "payment_link": "https://payment.web3bridgeafrica.com",
+            "breakdown_display": None,
         })
         self.assertIn("John Doe", rendered)
         self.assertIn("85.50", rendered)
         self.assertIn("https://payment.web3bridgeafrica.com", rendered)
+
+    def test_passed_template_renders_breakdown_when_present(self):
+        rendered = render_to_string("cohort/assessment_passed_email.html", {
+            "name": "John Doe",
+            "cohort": "Web3 Cohort XIV",
+            "score": "85.50",
+            "payment_link": "https://payment.web3bridgeafrica.com",
+            "breakdown_display": '{\n  "a": 40\n}',
+        })
+        self.assertIn("Score breakdown", rendered)
+        self.assertIn('"a": 40', rendered)
 
     def test_failed_template_renders_name_score_and_encouragement(self):
         rendered = render_to_string("cohort/assessment_failed_email.html", {
             "name": "John Doe",
             "cohort": "Web3 Cohort XIV",
             "score": "40.00",
+            "breakdown_display": None,
         })
         self.assertIn("John Doe", rendered)
         self.assertIn("40.00", rendered)
         self.assertIn("next cohort", rendered.lower())
+
+    def test_failed_template_renders_breakdown_when_present(self):
+        rendered = render_to_string("cohort/assessment_failed_email.html", {
+            "name": "John Doe",
+            "cohort": "Web3 Cohort XIV",
+            "score": "40.00",
+            "breakdown_display": "Section A: 10 / 30",
+        })
+        self.assertIn("Score breakdown", rendered)
+        self.assertIn("Section A: 10 / 30", rendered)

@@ -1,9 +1,6 @@
-env/
 .env
-*sql
 .env.local
-
-# Python (covers __pycache__ under */migrations/ and alembic/versions/)
+# Alembic revision *.py files under alembic/versions/ stay tracked; bytecode only:
 __pycache__/
 **/__pycache__/
 *.py[cod]

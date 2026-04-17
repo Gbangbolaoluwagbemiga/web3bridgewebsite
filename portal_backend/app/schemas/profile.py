@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, EmailStr, Field
 
 
 class MyProfileResponse(BaseModel):
@@ -10,6 +10,8 @@ class MyProfileResponse(BaseModel):
     full_name: str
     phone: str | None = None
     discord_id: str | None = None
+    discord_invite_link: str | None = None
+    discord_email: str | None = None
     wallet_address: str | None = None
     cohort: str | None = None
     onboarding_status: str
@@ -19,5 +21,7 @@ class MyProfileResponse(BaseModel):
 class UpdateMyProfileRequest(BaseModel):
     phone: str | None = Field(default=None, max_length=20)
     discord_id: str | None = Field(default=None, max_length=100)
+    discord_invite_link: str | None = Field(default=None, max_length=500)
+    discord_email: EmailStr | None = None
     wallet_address: str | None = Field(default=None, max_length=255)
     bio: str | None = None

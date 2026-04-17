@@ -16,9 +16,7 @@ __pycache__/
 __migrations__/
 *.py[cod]
 *$py.class
-blog/migrations/
-accounts/migrations/
-operations/migrations/
+# Migration *.py files under apps/*/migrations/ should be committed; only __pycache__/ is ignored above.
 .github/
 # C extensions
 *.so
@@ -173,6 +171,4 @@ __pycache__/
 *.idea/
 **/__pycache__/
 
-**/migrations/
-**/cohort/migrations/
 *.csv

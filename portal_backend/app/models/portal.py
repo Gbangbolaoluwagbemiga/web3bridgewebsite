@@ -91,6 +91,8 @@ class StudentProfile(TimestampMixin, Base):
     full_name: Mapped[str] = mapped_column(String(255), nullable=False)
     phone: Mapped[str | None] = mapped_column(String(20), nullable=True)
     discord_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    discord_invite_link: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    discord_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
     wallet_address: Mapped[str | None] = mapped_column(String(255), nullable=True)
     cohort: Mapped[str | None] = mapped_column(String(100), nullable=True, index=True)
     onboarding_status: Mapped[str] = mapped_column(
