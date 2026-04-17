@@ -74,22 +74,23 @@ export default function SolidityAssessmentModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-xl p-0 overflow-hidden rounded-2xl border-none shadow-2xl">
-        <div className="bg-gradient-to-br from-bridgeRed via-red-600 to-red-800 p-8 text-white">
-          <div className="w-16 h-16 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center mb-6 border border-white/30 rotate-3">
+      <DialogContent className="max-w-xl w-full p-0 overflow-hidden rounded-none sm:rounded-2xl border-none shadow-2xl flex flex-col h-[100dvh] sm:h-auto sm:max-h-[90vh]">
+        <div className="bg-gradient-to-br from-bridgeRed via-red-600 to-red-800 p-6 md:p-8 text-white shrink-0">
+           {/* Header Content remains the same but with responsive padding */}
+          <div className="w-16 h-16 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center mb-6 border border-white/30 rotate-3 hidden sm:flex">
             <ClipboardCheck className="w-8 h-8 text-white" />
           </div>
           <DialogHeader className="text-left space-y-2 p-0">
-            <DialogTitle className="text-3xl font-black tracking-tight leading-tight">
+            <DialogTitle className="text-2xl md:text-3xl font-black tracking-tight leading-tight">
               Ready for Your <br /> Assessment?
             </DialogTitle>
-            <DialogDescription className="text-red-100 text-base leading-relaxed opacity-90">
+            <DialogDescription className="text-red-100 text-sm md:text-base leading-relaxed opacity-90">
               Congratulations on completing your registration! Before you proceed, there's one final step to secure your spot.
             </DialogDescription>
           </DialogHeader>
         </div>
 
-        <div className="p-8 space-y-8 bg-white dark:bg-zinc-950">
+        <div className="p-6 md:p-8 space-y-6 md:space-y-8 bg-white dark:bg-zinc-950 overflow-y-auto">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="p-4 rounded-xl bg-gray-50 dark:bg-zinc-900 border border-gray-100 dark:border-zinc-800 flex items-start gap-3 transition-colors hover:bg-gray-100 dark:hover:bg-zinc-800/80">
               <div className="mt-1 p-2 bg-red-100 dark:bg-red-900/40 rounded-lg">
