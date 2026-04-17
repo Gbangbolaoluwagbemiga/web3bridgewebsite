@@ -160,12 +160,36 @@ export default function UnifiedRegistrationForm({
       { id: "onsite", label: "Onsite", icon: MapPin, description: "Join us in person at our Lagos hub" }
     ];
 
-    if (!selectedCourseObj || !selectedCourseObj.venue) return defaultOptions;
+    if (!selectedCourseObj) return defaultOptions;
 
-    // Optional: If backend provides specific venues, we could map them here.
-    // For now, we'll stick to the "Online/Onsite" requested by the user.
+    // Explicitly handle Web2 courses based on IDs or names
+    const isWeb2Course = 
+      selectedCourseName.toLowerCase().includes("web2") || 
+      [44, 45, 46].includes(selectedCourseObj.id);
+
+    if (isWeb2Course) {
+      // For Web2 courses, only allow Online
+      return [defaultOptions[0]];
+    }
+
+    // For other courses, filter by what's in the venue array if it exists
+    if (Array.isArray(selectedCourseObj.venue) && selectedCourseObj.venue.length > 0) {
+      const availableVenues = selectedCourseObj.venue.map((v: string) => v.toLowerCase());
+      return defaultOptions.filter(option => availableVenues.includes(option.id));
+    }
+
     return defaultOptions;
-  }, [selectedCourseObj]);
+  }, [selectedCourseObj, selectedCourseName]);
+
+  // Auto-select venue if only one is available
+  useEffect(() => {
+    if (venueOptions.length === 1 && selectedCourseName) {
+      const currentVenue = form.getValues("venue");
+      if (currentVenue !== venueOptions[0].id) {
+        form.setValue("venue", venueOptions[0].id);
+      }
+    }
+  }, [venueOptions, form, selectedCourseName]);
 
   return (
     <div className="max-w-[750px] w-full px-4 md:px-8 py-8 bg-white dark:bg-secondary/40 rounded-xl shadow-md transition-all duration-500 overflow-hidden">
