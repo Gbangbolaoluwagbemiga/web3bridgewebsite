@@ -5,7 +5,14 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Country, State } from "country-state-city";
-import { Loader2, MoveRight, MoveLeft, Globe, MapPin, CheckCircle2 } from "lucide-react";
+import {
+  Loader2,
+  MoveRight,
+  MoveLeft,
+  Globe,
+  MapPin,
+  CheckCircle2,
+} from "lucide-react";
 import { toast } from "sonner";
 import { useFetchAllCourses } from "@/hooks";
 import { unifiedRegistrationSchema } from "@/lib/validators";
@@ -55,7 +62,9 @@ export default function UnifiedRegistrationForm({
   errorMessage,
 }: UnifiedRegistrationFormProps) {
   const { data: courses, isLoading: isLoadingCourses } = useFetchAllCourses();
-  const [expandedDescriptions, setExpandedDescriptions] = useState<{ [key: string]: boolean }>({});
+  const [expandedDescriptions, setExpandedDescriptions] = useState<{
+    [key: string]: boolean;
+  }>({});
   const [showZKModal, setShowZKModal] = useState(false);
   const [countryCode, setCountryCode] = useState<string>("");
   const [hasConsented, setHasConsented] = useState(false);
@@ -116,7 +125,10 @@ export default function UnifiedRegistrationForm({
 
   const isZKCourse = (courseName: string) => {
     const name = courseName.toLowerCase();
-    const isZK = name.includes("zk") || name.includes("zero knowledge") || name.includes("zero-knowledge");
+    const isZK =
+      name.includes("zk") ||
+      name.includes("zero knowledge") ||
+      name.includes("zero-knowledge");
     const isRust = name.includes("rust");
     return isZK && !isRust;
   };
@@ -126,7 +138,7 @@ export default function UnifiedRegistrationForm({
 
   async function onSubmit(values: z.infer<typeof unifiedRegistrationSchema>) {
     setFormData(values);
-    
+
     // If ZK course, show modal first
     if (isZKCourse(values.course)) {
       setShowZKModal(true);
@@ -156,15 +168,25 @@ export default function UnifiedRegistrationForm({
   // Define venue options based on course data or default to Online/Onsite
   const venueOptions = useMemo(() => {
     const defaultOptions = [
-      { id: "online", label: "Online", icon: Globe, description: "Join from anywhere via Google Meet/Discord" },
-      { id: "onsite", label: "Onsite", icon: MapPin, description: "Join us in person at our Lagos hub" }
+      {
+        id: "online",
+        label: "Online",
+        icon: Globe,
+        description: "Join from anywhere via Google Meet/Discord",
+      },
+      {
+        id: "onsite",
+        label: "Onsite",
+        icon: MapPin,
+        description: "Join us in person at our Lagos hub",
+      },
     ];
 
     if (!selectedCourseObj) return defaultOptions;
 
     // Explicitly handle Web2 courses based on IDs or names
-    const isWeb2Course = 
-      selectedCourseName.toLowerCase().includes("web2") || 
+    const isWeb2Course =
+      selectedCourseName.toLowerCase().includes("web2") ||
       [44, 45, 46].includes(selectedCourseObj.id);
 
     if (isWeb2Course) {
@@ -173,9 +195,16 @@ export default function UnifiedRegistrationForm({
     }
 
     // For other courses, filter by what's in the venue array if it exists
-    if (Array.isArray(selectedCourseObj.venue) && selectedCourseObj.venue.length > 0) {
-      const availableVenues = selectedCourseObj.venue.map((v: string) => v.toLowerCase());
-      return defaultOptions.filter(option => availableVenues.includes(option.id));
+    if (
+      Array.isArray(selectedCourseObj.venue) &&
+      selectedCourseObj.venue.length > 0
+    ) {
+      const availableVenues = selectedCourseObj.venue.map((v: string) =>
+        v.toLowerCase(),
+      );
+      return defaultOptions.filter((option) =>
+        availableVenues.includes(option.id),
+      );
     }
 
     return defaultOptions;
@@ -194,8 +223,12 @@ export default function UnifiedRegistrationForm({
   return (
     <div className="max-w-[750px] w-full px-4 md:px-8 py-8 bg-white dark:bg-secondary/40 rounded-xl shadow-md transition-all duration-500 overflow-hidden">
       <div className="mb-8 border-b pb-4">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Registration</h1>
-        <p className="text-gray-500 dark:text-gray-400 mt-1 text-sm">Join the next cohort of builders at Web3bridge.</p>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+          Registration
+        </h1>
+        <p className="text-gray-500 dark:text-gray-400 mt-1 text-sm">
+          Join the next cohort of builders at Web3bridge.
+        </p>
       </div>
 
       <Form {...form}>
@@ -204,10 +237,12 @@ export default function UnifiedRegistrationForm({
           {!selectedCourseName && (
             <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
               <h2 className="text-lg font-semibold flex items-center gap-2">
-                <span className="flex items-center justify-center w-6 h-6 rounded-full bg-bridgeRed text-white text-xs">1</span>
+                <span className="flex items-center justify-center w-6 h-6 rounded-full bg-bridgeRed text-white text-xs">
+                  1
+                </span>
                 Select Your Course
               </h2>
-              
+
               <FormField
                 control={form.control}
                 name="course"
@@ -232,10 +267,13 @@ export default function UnifiedRegistrationForm({
                                 course.status === false
                                   ? "bg-gray-50 border-gray-200 opacity-60 grayscale"
                                   : field.value === course.name
-                                  ? "bg-red-50/50 border-bridgeRed shadow-[0_0_15px_-5px_rgba(250,1,1,0.2)]"
-                                  : "bg-white border-gray-200 hover:border-red-300 hover:bg-red-50/10"
+                                    ? "bg-red-50/50 border-bridgeRed shadow-[0_0_15px_-5px_rgba(250,1,1,0.2)]"
+                                    : "bg-white border-gray-200 hover:border-red-300 hover:bg-red-50/10"
                               }`}
-                              onClick={() => course.status !== false && field.onChange(course.name)}
+                              onClick={() =>
+                                course.status !== false &&
+                                field.onChange(course.name)
+                              }
                             >
                               <FormControl>
                                 <RadioGroupItem
@@ -249,12 +287,16 @@ export default function UnifiedRegistrationForm({
                                 <Label
                                   htmlFor={course.name}
                                   className={`font-bold text-base cursor-pointer flex items-center justify-between ${
-                                    course.status === false ? "text-gray-400" : "text-gray-900 dark:text-white"
+                                    course.status === false
+                                      ? "text-gray-400"
+                                      : "text-gray-900 dark:text-white"
                                   }`}
                                 >
                                   <span>{course.name}</span>
                                   {course.status === false && (
-                                    <span className="ml-2 text-[10px] bg-gray-200 text-gray-600 px-2 py-0.5 rounded uppercase">Closed</span>
+                                    <span className="ml-2 text-[10px] bg-gray-200 text-gray-600 px-2 py-0.5 rounded uppercase">
+                                      Closed
+                                    </span>
                                   )}
                                 </Label>
                                 {course.description && (
@@ -273,7 +315,9 @@ export default function UnifiedRegistrationForm({
                                         }}
                                         className="text-xs font-semibold text-bridgeRed mt-1 hover:underline"
                                       >
-                                        {expandedDescriptions[course.id] ? "Show Less" : "Show More"}
+                                        {expandedDescriptions[course.id]
+                                          ? "Show Less"
+                                          : "Show More"}
                                       </button>
                                     )}
                                   </div>
@@ -300,10 +344,13 @@ export default function UnifiedRegistrationForm({
                   onClick={() => form.setValue("course", "")}
                   className="text-sm font-medium text-gray-500 hover:text-bridgeRed flex items-center gap-1 transition-colors group"
                 >
-                  <MoveLeft className="w-4 h-4 transition-transform group-hover:-translate-x-1" /> Change Course
+                  <MoveLeft className="w-4 h-4 transition-transform group-hover:-translate-x-1" />{" "}
+                  Change Course
                 </button>
                 <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Registration Fee</span>
+                  <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">
+                    Registration Fee
+                  </span>
                   <div className="text-sm font-black text-bridgeRed bg-red-50 border border-red-100 px-3 py-1 rounded-full">
                     {courseDetail.price}
                   </div>
@@ -312,13 +359,23 @@ export default function UnifiedRegistrationForm({
 
               <div className="bg-gray-50 dark:bg-gray-900/50 rounded-2xl p-6 md:p-8 border border-gray-100 dark:border-gray-800 shadow-inner">
                 <div className="prose prose-sm dark:prose-invert max-w-none">
-                  {courseDetail.letter.split('\n').map((line, i) => {
+                  {courseDetail.letter.split("\n").map((line, i) => {
                     const parts = line.split(/(\*\*.*?\*\*)/g);
                     return (
-                      <p key={i} className="mb-4 text-gray-700 dark:text-gray-300 font-['Outfit'] leading-relaxed last:mb-0">
+                      <p
+                        key={i}
+                        className="mb-4 text-gray-700 dark:text-gray-300 font-['Outfit'] leading-relaxed last:mb-0"
+                      >
                         {parts.map((part, index) => {
-                          if (part.startsWith('**') && part.endsWith('**')) {
-                            return <strong key={index} className="font-bold text-gray-900 dark:text-white">{part.slice(2, -2)}</strong>;
+                          if (part.startsWith("**") && part.endsWith("**")) {
+                            return (
+                              <strong
+                                key={index}
+                                className="font-bold text-gray-900 dark:text-white"
+                              >
+                                {part.slice(2, -2)}
+                              </strong>
+                            );
                           }
                           return part;
                         })}
@@ -329,22 +386,25 @@ export default function UnifiedRegistrationForm({
               </div>
 
               <div className="pt-4 space-y-6">
-                <label 
+                <label
                   className={`flex items-start gap-4 p-5 rounded-2xl border-2 transition-all cursor-pointer ${
-                    consentChecked 
-                      ? "bg-red-50/40 border-bridgeRed shadow-md" 
+                    consentChecked
+                      ? "bg-red-50/40 border-bridgeRed shadow-md"
                       : "bg-white dark:bg-gray-950 border-gray-100 dark:border-gray-800 hover:border-red-100"
                   }`}
                 >
-                  <Checkbox 
-                    id="consent" 
+                  <Checkbox
+                    id="consent"
                     checked={consentChecked}
-                    onCheckedChange={(checked: boolean | "indeterminate") => setConsentChecked(checked === true)}
+                    onCheckedChange={(checked: boolean | "indeterminate") =>
+                      setConsentChecked(checked === true)
+                    }
                     className="mt-1 w-5 h-5 border-gray-300 data-[state=checked]:bg-bridgeRed data-[state=checked]:border-bridgeRed transition-colors"
                   />
                   <div className="space-y-1 select-none">
                     <span className="text-sm font-bold text-gray-800 dark:text-gray-200 leading-tight">
-                      I hereby confirm that I have read and understood perfectly all the details and policies regarding this programme.
+                      I hereby confirm that I have read and understood perfectly
+                      all the details and policies regarding this programme.
                     </span>
                   </div>
                 </label>
@@ -356,7 +416,8 @@ export default function UnifiedRegistrationForm({
                     disabled={!consentChecked}
                     className="w-full max-w-[340px] h-14 text-base font-black bg-bridgeRed hover:bg-bridgeRed/90 text-white rounded-full transition-all hover:scale-[1.02] active:scale-[0.98] shadow-xl shadow-bridgeRed/20 disabled:opacity-50 disabled:grayscale disabled:scale-100 uppercase tracking-wide"
                   >
-                    Continue to Registration <MoveRight className="w-5 h-5 ml-2" />
+                    Continue to Registration{" "}
+                    <MoveRight className="w-5 h-5 ml-2" />
                   </CustomButton>
                 </div>
               </div>
@@ -372,15 +433,18 @@ export default function UnifiedRegistrationForm({
                   onClick={() => form.setValue("course", "")}
                   className="text-sm font-medium text-gray-500 hover:text-bridgeRed flex items-center gap-1 transition-colors group"
                 >
-                  <MoveLeft className="w-4 h-4 transition-transform group-hover:-translate-x-1" /> Change Course
+                  <MoveLeft className="w-4 h-4 transition-transform group-hover:-translate-x-1" />{" "}
+                  Change Course
                 </button>
                 <div className="text-sm font-bold text-bridgeRed bg-red-50 border border-red-100 px-3 py-1 rounded-full">
                   {selectedCourseName}
                 </div>
               </div>
-              
+
               <h2 className="text-lg font-semibold flex items-center gap-2">
-                <span className="flex items-center justify-center w-6 h-6 rounded-full bg-bridgeRed text-white text-xs">2</span>
+                <span className="flex items-center justify-center w-6 h-6 rounded-full bg-bridgeRed text-white text-xs">
+                  2
+                </span>
                 Personal Details
               </h2>
 
@@ -392,7 +456,11 @@ export default function UnifiedRegistrationForm({
                     <FormItem>
                       <FormLabel>Full Name</FormLabel>
                       <FormControl>
-                        <Input placeholder="John Doe" className="h-12 bg-gray-50/30" {...field} />
+                        <Input
+                          placeholder="John Doe"
+                          className="h-12 bg-gray-50/30"
+                          {...field}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -406,7 +474,11 @@ export default function UnifiedRegistrationForm({
                     <FormItem>
                       <FormLabel>Email Address</FormLabel>
                       <FormControl>
-                        <Input placeholder="john@example.com" className="h-12 bg-gray-50/30" {...field} />
+                        <Input
+                          placeholder="john@example.com"
+                          className="h-12 bg-gray-50/30"
+                          {...field}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -420,7 +492,11 @@ export default function UnifiedRegistrationForm({
                     <FormItem>
                       <FormLabel>Phone Number</FormLabel>
                       <FormControl>
-                        <Input placeholder="+234..." className="h-12 bg-gray-50/30" {...field} />
+                        <Input
+                          placeholder="+234..."
+                          className="h-12 bg-gray-50/30"
+                          {...field}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -435,7 +511,11 @@ export default function UnifiedRegistrationForm({
                       <FormItem>
                         <FormLabel>GitHub Profile Link</FormLabel>
                         <FormControl>
-                          <Input placeholder="https://github.com/username" className="h-12 bg-gray-50/30" {...field} />
+                          <Input
+                            placeholder="https://github.com/username"
+                            className="h-12 bg-gray-50/30"
+                            {...field}
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -449,7 +529,9 @@ export default function UnifiedRegistrationForm({
                   name="venue"
                   render={({ field }) => (
                     <FormItem className="col-span-1 md:col-span-2">
-                      <FormLabel className="text-base font-semibold">Preferred Venue</FormLabel>
+                      <FormLabel className="text-base font-semibold">
+                        Preferred Venue
+                      </FormLabel>
                       <FormControl>
                         <RadioGroup
                           onValueChange={field.onChange}
@@ -474,10 +556,14 @@ export default function UnifiedRegistrationForm({
                                       : "bg-white dark:bg-gray-900 border-gray-100 dark:border-gray-800"
                                   }`}
                                 >
-                                  <div className={`p-3 rounded-xl mb-4 ${isSelected ? "bg-bridgeRed text-white" : "bg-gray-100 dark:bg-gray-800 text-gray-500"}`}>
+                                  <div
+                                    className={`p-3 rounded-xl mb-4 ${isSelected ? "bg-bridgeRed text-white" : "bg-gray-100 dark:bg-gray-800 text-gray-500"}`}
+                                  >
                                     <Icon className="w-6 h-6" />
                                   </div>
-                                  <span className={`text-base font-bold mb-1 ${isSelected ? "text-bridgeRed" : "text-gray-900 dark:text-white"}`}>
+                                  <span
+                                    className={`text-base font-bold mb-1 ${isSelected ? "text-bridgeRed" : "text-gray-900 dark:text-white"}`}
+                                  >
                                     {option.label}
                                   </span>
                                   <span className="text-xs text-gray-500 text-center max-w-[150px]">
@@ -506,7 +592,9 @@ export default function UnifiedRegistrationForm({
                       <Select
                         onValueChange={(value) => {
                           field.onChange(value);
-                          const selectedCountry = countries.find((c) => c.name === value);
+                          const selectedCountry = countries.find(
+                            (c) => c.name === value,
+                          );
                           setCountryCode(selectedCountry?.isoCode || "");
                           form.setValue("state", "");
                         }}
@@ -519,7 +607,10 @@ export default function UnifiedRegistrationForm({
                         </FormControl>
                         <SelectContent className="max-h-[300px]">
                           {countries.map((country) => (
-                            <SelectItem key={country.isoCode} value={country.name}>
+                            <SelectItem
+                              key={country.isoCode}
+                              value={country.name}
+                            >
                               {country.name}
                             </SelectItem>
                           ))}
@@ -543,7 +634,13 @@ export default function UnifiedRegistrationForm({
                       >
                         <FormControl>
                           <SelectTrigger className="h-12 bg-gray-50/30">
-                            <SelectValue placeholder={countryCode ? "Select State" : "Select country first"} />
+                            <SelectValue
+                              placeholder={
+                                countryCode
+                                  ? "Select State"
+                                  : "Select country first"
+                              }
+                            />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent className="max-h-[300px]">
@@ -574,7 +671,8 @@ export default function UnifiedRegistrationForm({
                     </>
                   ) : (
                     <>
-                      Submit Registration <MoveRight className="w-5 h-5 ml-2 transition-transform group-hover:translate-x-1" />
+                      Submit Registration{" "}
+                      <MoveRight className="w-5 h-5 ml-2 transition-transform group-hover:translate-x-1" />
                     </>
                   )}
                 </CustomButton>
