@@ -17,7 +17,6 @@ from .helpers.model import (
     send_approval_email,
     send_assessment_failed_email,
     send_assessment_passed_email,
-    send_participant_details,
     send_registration_success_mail,
     send_reschedule_assessment_email,
 )
@@ -61,7 +60,6 @@ def handle_payment_success(
     activation_url = create_portal_onboarding_invite(participant_object)
 
     send_registration_success_mail(email, course_id, participant_name, activation_url=activation_url)
-    send_participant_details(email, course_id, serialized_participant_obj)
     return serializer_class.Retrieve(participant_object).data
 
 
@@ -577,8 +575,10 @@ class ParticipantViewSet(GuestReadAllWriteAdminOnlyPermissionMixin, viewsets.Vie
         course_id = serialized_participant_obj.get("course", {}).get("id")
         participant_name = serialized_participant_obj.get("name")
 
-        send_registration_success_mail(email, course_id, participant_name)
-        send_participant_details(email, course_id, serialized_participant_obj)
+        activation_url = create_portal_onboarding_invite(participant_object)
+        send_registration_success_mail(
+            email, course_id, participant_name, activation_url=activation_url
+        )
 
         return requestUtils.success_response(
             data=serialized_participant_obj, http_status=status.HTTP_200_OK

@@ -73,6 +73,45 @@ class RegistrationEmailTemplateTests(SimpleTestCase):
                 self.assertIn("Hi there,", rendered)
                 self.assertNotIn("Activate your student portal account", rendered)
 
+    @patch("cohort.helpers.model.base.EmailMessage")
+    @patch("cohort.helpers.model.base.render_to_string")
+    @patch("cohort.models.Course.objects.get")
+    def test_web2_registration_success_mail_static_context_and_template(
+        self, mock_course_get, mock_render, mock_email_cls
+    ):
+        mock_render.return_value = "<html></html>"
+        mock_email_cls.return_value = MagicMock()
+        mock_course = MagicMock()
+        mock_course.name = "Web2 Advanced Frontend"
+        mock_course_get.return_value = mock_course
+
+        from cohort.helpers.model.base import send_registration_success_mail
+
+        send_registration_success_mail(
+            "student@example.com",
+            1,
+            "Ignored Name",
+            activation_url="https://portal.example.com/activate",
+        )
+
+        mock_render.assert_called_once()
+        self.assertEqual(
+            mock_render.call_args[0][0],
+            "cohort/web2_advanced_frontend_registration_email.html",
+        )
+        self.assertEqual(mock_render.call_args[0][1], {})
+
+    def test_send_participant_details_is_noop(self):
+        from cohort.helpers.model.base import send_participant_details
+
+        self.assertIsNone(
+            send_participant_details(
+                "student@example.com",
+                1,
+                {"name": "Student", "email": "student@example.com"},
+            )
+        )
+
     def test_non_zk_templates_hide_activation_url_when_missing(self):
         template_names = [
             "cohort/web3_registration_email.html",
@@ -752,11 +791,15 @@ class PaymentActivationEmailTests(SimpleTestCase):
             )
 
         call_kwargs = mock_render.call_args
+        self.assertEqual(
+            call_kwargs[0][0], "cohort/portal_registration_confirmation_email.html"
+        )
         context = call_kwargs[0][1]
         self.assertEqual(
             context.get("activation_url"),
-            "https://portal.web3bridge.com/activate/onboard?token=abc"
+            "https://portal.web3bridge.com/activate/onboard?token=abc",
         )
+        self.assertEqual(context.get("course_name"), "Web3 Development")
 
     @patch("cohort.helpers.model.base.render_to_string")
     @patch("cohort.helpers.model.base.EmailMessage")
@@ -776,14 +819,17 @@ class PaymentActivationEmailTests(SimpleTestCase):
             )
 
         call_kwargs = mock_render.call_args
+        self.assertEqual(
+            call_kwargs[0][0], "cohort/portal_registration_confirmation_email.html"
+        )
         context = call_kwargs[0][1]
         self.assertIsNone(context.get("activation_url"))
+        self.assertEqual(context.get("course_name"), "ZK Cohort XIV")
 
     @patch("cohort.views.send_registration_success_mail")
-    @patch("cohort.views.send_participant_details")
     @patch("cohort.views.create_portal_onboarding_invite")
     def test_handle_payment_success_calls_portal_invite(
-        self, mock_invite, mock_details, mock_mail
+        self, mock_invite, mock_mail
     ):
         from cohort.views import handle_payment_success
         from unittest.mock import MagicMock
