@@ -39,7 +39,7 @@ export default function RootLayout({
           defaultTheme="light"
           enableSystem
           disableTransitionOnChange>
-          <Toaster richColors />
+          <Toaster richColors position="top-right" duration={Infinity} closeButton />
           <Header />
 
           <main className="flex-1">{children}</main>
