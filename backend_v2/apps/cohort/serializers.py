@@ -369,6 +369,7 @@ class SubmitAssessmentSerializer(serializers.Serializer):
     email = serializers.EmailField()
     score = serializers.DecimalField(max_digits=5, decimal_places=2)
     passed = serializers.BooleanField()
+    breakdown = serializers.JSONField(required=False, allow_null=True)
 
 
 # Testimonial Serializer

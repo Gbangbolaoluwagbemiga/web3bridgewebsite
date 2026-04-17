@@ -211,6 +211,7 @@ class Assessment(models.Model):
         related_name='assessments',
     )
     score = models.DecimalField(_('score'), max_digits=5, decimal_places=2)
+    breakdown = models.JSONField(_('breakdown'), blank=True, null=True)
     date_taken = models.DateTimeField(_('date taken'))
     passed = models.BooleanField(_('passed'), default=False)
 

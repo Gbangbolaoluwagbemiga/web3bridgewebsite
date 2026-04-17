@@ -1,3 +1,4 @@
+import json
 import logging
 import re
 
@@ -269,7 +270,16 @@ def send_approval_email(participant, payment_link: str | None = None):
         pass
 
 
-def send_assessment_passed_email(email, name, cohort, score, payment_link):
+def _format_assessment_breakdown(breakdown):
+    """Format breakdown for HTML email (JSON, list, or plain text)."""
+    if breakdown in (None, "", {}, []):
+        return None
+    if isinstance(breakdown, (dict, list)):
+        return json.dumps(breakdown, indent=2, ensure_ascii=False)
+    return str(breakdown)
+
+
+def send_assessment_passed_email(email, name, cohort, score, payment_link, breakdown=None):
     """Send a congratulations email with a payment CTA when a participant passes."""
     try:
         context = {
@@ -277,6 +287,7 @@ def send_assessment_passed_email(email, name, cohort, score, payment_link):
             "cohort": cohort,
             "score": score,
             "payment_link": payment_link,
+            "breakdown_display": _format_assessment_breakdown(breakdown),
         }
         message = render_to_string("cohort/assessment_passed_email.html", context)
         subject = f"Congratulations! You Passed Your Web3Bridge Assessment – {cohort}"
@@ -301,13 +312,14 @@ def send_assessment_passed_email(email, name, cohort, score, payment_link):
         pass
 
 
-def send_assessment_failed_email(email, name, cohort, score):
+def send_assessment_failed_email(email, name, cohort, score, breakdown=None):
     """Send an encouraging email when a participant fails their assessment."""
     try:
         context = {
             "name": name,
             "cohort": cohort,
             "score": score,
+            "breakdown_display": _format_assessment_breakdown(breakdown),
         }
         message = render_to_string("cohort/assessment_failed_email.html", context)
         subject = f"Your Web3Bridge Assessment Result – {cohort}"
