@@ -320,7 +320,7 @@ export default function UnifiedRegistrationForm({
                   />
                   <div className="space-y-1 select-none">
                     <span className="text-sm font-bold text-gray-800 dark:text-gray-200 leading-tight">
-                      I underscore that I have read and understood perfectly all the details and policies regarding this programme.
+                      I hereby confirm that I have read and understood perfectly all the details and policies regarding this programme.
                     </span>
                   </div>
                 </label>
