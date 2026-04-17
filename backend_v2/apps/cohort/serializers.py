@@ -362,6 +362,19 @@ class EmailSerializer(serializers.Serializer):
     email = serializers.EmailField()
 
 
+class VerifyPaymentByEmailSerializer(serializers.Serializer):
+    """Payload from payment service when marking a participant paid on the main server."""
+
+    email = serializers.EmailField()
+    paymentId = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        max_length=255,
+        help_text="Opaque payment reference from the payment backend (stored for tracing only).",
+    )
+    status = serializers.BooleanField(required=False, default=True)
+
+
 class RescheduleAssessmentSerializer(serializers.Serializer):
     email = serializers.EmailField()
     name = serializers.CharField(max_length=255)

@@ -13,6 +13,29 @@ from .helpers.portal import (
 )
 
 
+class VerifyPaymentSerializerTests(SimpleTestCase):
+    def test_accepts_email_with_optional_payment_id_and_status(self):
+        from cohort.serializers import VerifyPaymentByEmailSerializer
+
+        s = VerifyPaymentByEmailSerializer(
+            data={
+                "email": "user@example.com",
+                "paymentId": "fiat-1776441344601-zve4ev",
+                "status": True,
+            }
+        )
+        self.assertTrue(s.is_valid(), s.errors)
+        self.assertEqual(s.validated_data["email"], "user@example.com")
+        self.assertEqual(s.validated_data["paymentId"], "fiat-1776441344601-zve4ev")
+        self.assertTrue(s.validated_data["status"])
+
+    def test_email_only_is_valid(self):
+        from cohort.serializers import VerifyPaymentByEmailSerializer
+
+        s = VerifyPaymentByEmailSerializer(data={"email": "user@example.com"})
+        self.assertTrue(s.is_valid(), s.errors)
+
+
 class PortalInviteHelperTests(SimpleTestCase):
     def test_is_zk_course_name_detects_zk_course(self):
         self.assertTrue(is_zk_course_name("Zero Knowledge Bootcamp"))
@@ -771,11 +794,9 @@ class PaymentActivationEmailTests(SimpleTestCase):
 
     @patch("cohort.helpers.model.base.render_to_string")
     @patch("cohort.helpers.model.base.EmailMessage")
-    @patch("cohort.views.create_portal_onboarding_invite")
     def test_activation_url_passed_to_email_for_web3_course(
-        self, mock_invite, mock_email_cls, mock_render
+        self, mock_email_cls, mock_render
     ):
-        mock_invite.return_value = "https://portal.web3bridge.com/activate/onboard?token=abc"
         mock_render.return_value = "<html></html>"
         mock_email_cls.return_value = MagicMock()
 
@@ -791,15 +812,13 @@ class PaymentActivationEmailTests(SimpleTestCase):
             )
 
         call_kwargs = mock_render.call_args
-        self.assertEqual(
-            call_kwargs[0][0], "cohort/portal_registration_confirmation_email.html"
-        )
+        self.assertEqual(call_kwargs[0][0], "cohort/web3_registration_email.html")
         context = call_kwargs[0][1]
         self.assertEqual(
             context.get("activation_url"),
             "https://portal.web3bridge.com/activate/onboard?token=abc",
         )
-        self.assertEqual(context.get("course_name"), "Web3 Development")
+        self.assertEqual(context.get("name"), "John Doe")
 
     @patch("cohort.helpers.model.base.render_to_string")
     @patch("cohort.helpers.model.base.EmailMessage")
@@ -819,12 +838,10 @@ class PaymentActivationEmailTests(SimpleTestCase):
             )
 
         call_kwargs = mock_render.call_args
-        self.assertEqual(
-            call_kwargs[0][0], "cohort/portal_registration_confirmation_email.html"
-        )
+        self.assertEqual(call_kwargs[0][0], "cohort/zk_registration_email.html")
         context = call_kwargs[0][1]
         self.assertIsNone(context.get("activation_url"))
-        self.assertEqual(context.get("course_name"), "ZK Cohort XIV")
+        self.assertEqual(context.get("name"), "ZK Student")
 
     @patch("cohort.views.send_registration_success_mail")
     @patch("cohort.views.create_portal_onboarding_invite")
@@ -837,6 +854,7 @@ class PaymentActivationEmailTests(SimpleTestCase):
         mock_invite.return_value = "https://portal.web3bridge.com/activate/onboard?token=xyz"
 
         participant = MagicMock()
+        participant.course_id = 1
         serialized = {
             "email": "student@example.com",
             "name": "John Doe",

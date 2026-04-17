@@ -52,14 +52,44 @@ API_KEY = config("PAYMENT_API_KEY")
 def handle_payment_success(
     participant_object, serialized_participant_obj, serializer_class
 ):
+    """
+    Refresh serialized participant after payment. Portal invite and welcome email are
+    best-effort: failures are logged and never fail the HTTP response.
+    """
     email = serialized_participant_obj.get("email")
     participant_name = serialized_participant_obj.get("name")
-    course_id = serialized_participant_obj.get("course").get("id")
+    course_id = getattr(participant_object, "course_id", None)
+    course_data = serialized_participant_obj.get("course")
+    if course_id is None and isinstance(course_data, dict):
+        course_id = course_data.get("id")
+    if not course_id:
+        logger.warning(
+            "Payment flow for %s: participant id=%s has no course; skipping portal invite and welcome email",
+            email,
+            getattr(participant_object, "id", None),
+        )
+        return serializer_class.Retrieve(participant_object).data
 
-    # Get portal activation URL for non-ZK students
-    activation_url = create_portal_onboarding_invite(participant_object)
+    try:
+        activation_url = create_portal_onboarding_invite(participant_object)
+    except Exception:
+        logger.exception(
+            "Portal onboarding invite failed for participant %s",
+            getattr(participant_object, "id", None),
+        )
+        activation_url = None
 
-    send_registration_success_mail(email, course_id, participant_name, activation_url=activation_url)
+    try:
+        send_registration_success_mail(
+            email, course_id, participant_name, activation_url=activation_url
+        )
+    except Exception:
+        logger.exception(
+            "send_registration_success_mail failed for %s (course_id=%s)",
+            email,
+            course_id,
+        )
+
     return serializer_class.Retrieve(participant_object).data
 
 
@@ -458,7 +488,7 @@ class ParticipantViewSet(GuestReadAllWriteAdminOnlyPermissionMixin, viewsets.Vie
             http_status=status.HTTP_400_BAD_REQUEST,
         )
 
-    @swagger_auto_schema(request_body=serializers.EmailSerializer)
+    @swagger_auto_schema(request_body=serializers.VerifyPaymentByEmailSerializer)
     @decorators.action(
         detail=False, methods=["post"], url_path="verify-payment-by-email"
     )
@@ -468,11 +498,14 @@ class ParticipantViewSet(GuestReadAllWriteAdminOnlyPermissionMixin, viewsets.Vie
                 {"error": "Invalid or missing API key"},
                 status=status.HTTP_401_UNAUTHORIZED,
             )
-        email = request.data.get("email")
-        if not email:
+        body = serializers.VerifyPaymentByEmailSerializer(data=request.data)
+        if not body.is_valid():
             return requestUtils.error_response(
-                "Email is required", {}, http_status=status.HTTP_400_BAD_REQUEST
+                "Invalid request",
+                body.errors,
+                http_status=status.HTTP_400_BAD_REQUEST,
             )
+        email = body.validated_data["email"]
 
         participant_object = self.get_queryset().filter(email=email).first()
         if not participant_object:
