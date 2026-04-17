@@ -259,7 +259,15 @@ PORTAL_INTERNAL_API_KEY = config(
     default=config("PAYMENT_API_KEY", default=""),
 )
 PORTAL_REQUEST_TIMEOUT = config("PORTAL_REQUEST_TIMEOUT", default=10, cast=int)
-PORTAL_REQUEST_MAX_RETRIES = config("PORTAL_REQUEST_MAX_RETRIES", default=2, cast=int)
+PORTAL_REQUEST_CONNECT_TIMEOUT = config(
+    "PORTAL_REQUEST_CONNECT_TIMEOUT", default=5, cast=int
+)
+# Hard cap for the whole invite call (retries + backoff) so gunicorn workers are not killed
+# (default worker timeout is often 30s).
+PORTAL_REQUEST_MAX_WALL_SECONDS = config(
+    "PORTAL_REQUEST_MAX_WALL_SECONDS", default=24, cast=int
+)
+PORTAL_REQUEST_MAX_RETRIES = config("PORTAL_REQUEST_MAX_RETRIES", default=1, cast=int)
 PORTAL_REQUEST_RETRY_BACKOFF_SECONDS = config(
     "PORTAL_REQUEST_RETRY_BACKOFF_SECONDS", default=0.5, cast=float
 )

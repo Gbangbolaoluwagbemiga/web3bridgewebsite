@@ -194,7 +194,7 @@ class RegistrationEmailTemplateTests(SimpleTestCase):
                 "approval_status": "approved",
             },
             headers={"X-Internal-API-Key": "secret-key"},
-            timeout=5,
+            timeout=(5.0, 5.0),
         )
 
     @patch("apps.cohort.helpers.portal.requests.post")

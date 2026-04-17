@@ -63,13 +63,16 @@ def create_portal_onboarding_invite(participant):
     if is_zk_course_name(course_name):
         return None
 
-    portal_onboarding_url = getattr(settings, "PORTAL_ONBOARDING_URL", "")
+    portal_onboarding_url = (getattr(settings, "PORTAL_ONBOARDING_URL", "") or "").strip()
     internal_api_key = getattr(settings, "PORTAL_INTERNAL_API_KEY", "")
-    timeout = getattr(settings, "PORTAL_REQUEST_TIMEOUT", 10)
-    max_retries = max(0, int(getattr(settings, "PORTAL_REQUEST_MAX_RETRIES", 2)))
+    read_timeout = float(getattr(settings, "PORTAL_REQUEST_TIMEOUT", 10))
+    connect_timeout = float(getattr(settings, "PORTAL_REQUEST_CONNECT_TIMEOUT", 5))
+    max_retries = max(0, int(getattr(settings, "PORTAL_REQUEST_MAX_RETRIES", 1)))
     backoff_seconds = float(
         getattr(settings, "PORTAL_REQUEST_RETRY_BACKOFF_SECONDS", 0.5)
     )
+    wall_seconds = float(getattr(settings, "PORTAL_REQUEST_MAX_WALL_SECONDS", 24))
+    deadline = time.monotonic() + wall_seconds
 
     if not portal_onboarding_url or not internal_api_key:
         logger.warning(
@@ -90,12 +93,25 @@ def create_portal_onboarding_invite(participant):
     }
 
     for attempt in range(max_retries + 1):
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            logger.warning(
+                "Portal onboarding invite aborted for participant %s: wall-clock budget exceeded "
+                "(%ss) before attempt %s",
+                getattr(participant, "id", None),
+                wall_seconds,
+                attempt + 1,
+            )
+            return None
+        # Stay under gunicorn worker timeout: shrink read timeout on the last slice of the budget.
+        per_attempt_read = min(read_timeout, max(0.5, remaining))
+
         try:
             response = requests.post(
                 portal_onboarding_url,
                 json=payload,
                 headers={"X-Internal-API-Key": internal_api_key},
-                timeout=timeout,
+                timeout=(connect_timeout, per_attempt_read),
             )
             response.raise_for_status()
             response_data = response.json()
@@ -110,7 +126,10 @@ def create_portal_onboarding_invite(participant):
                 )
                 return None
 
-            sleep_seconds = backoff_seconds * (2**attempt)
+            sleep_seconds = min(
+                backoff_seconds * (2**attempt),
+                max(0.0, deadline - time.monotonic()),
+            )
             if sleep_seconds > 0:
                 time.sleep(sleep_seconds)
         except ValueError:
