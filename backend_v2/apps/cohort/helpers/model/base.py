@@ -16,6 +16,33 @@ def testimonial_image_location(instance, filename):
     return f"{settings.ENVIROMENT}/Testimonial/{full_name_processed}/{filename}"
 
 
+def _web2_registration_template_and_subject(course_name):
+    """
+    Map Web2 course titles to welcome email template and subject.
+    Order: specific tracks before generic Web2 / Launchpad fallback.
+    """
+    name_lc = (course_name or "").lower()
+    if "advanced backend" in name_lc:
+        return (
+            "cohort/web2_advanced_backend_registration_email.html",
+            "Welcome to Web2 Advanced Backend – Web3Bridge",
+        )
+    if "advanced frontend" in name_lc:
+        return (
+            "cohort/web2_advanced_frontend_registration_email.html",
+            "Welcome to Web2 Advanced Frontend – Web3Bridge",
+        )
+    if "launchpad" in name_lc:
+        return (
+            "cohort/web2_launchpad_registration_email.html",
+            "Welcome to Web2 Launchpad – Web3Bridge",
+        )
+    return (
+        "cohort/web2_launchpad_registration_email.html",
+        "Welcome to Web2 Launchpad – Web3Bridge",
+    )
+
+
 def send_registration_success_mail(email, course_id, participant, activation_url=None):
     from cohort.models import Course
 
@@ -29,8 +56,7 @@ def send_registration_success_mail(email, course_id, participant, activation_url
             subject = "Rust Masterclass Registration Success"
             template_name = "cohort/rust_registration_email.html"
         elif re.search(r"\bweb2\b", name_lc):
-            subject = "Web2 Registration Success"
-            template_name = "cohort/web2_registration_email.html"
+            template_name, subject = _web2_registration_template_and_subject(course.name)
         elif re.search(r"\bweb3\b", name_lc):
             subject = "Web3 Registration Success"
             template_name = "cohort/web3_registration_email.html"
@@ -41,10 +67,13 @@ def send_registration_success_mail(email, course_id, participant, activation_url
             subject = f"{course.name} Registration Success"
             template_name = "other_registration_email.html"
 
-        context = {
-            "name": participant,
-            "activation_url": None if is_zk else activation_url,
-        }
+        if re.search(r"\bweb2\b", name_lc):
+            context = {}
+        else:
+            context = {
+                "name": participant,
+                "activation_url": None if is_zk else activation_url,
+            }
         message = render_to_string(template_name, context)
 
         # Use admission email credentials if available, otherwise fall back to default
@@ -91,6 +120,8 @@ def send_participant_details(email, course_id, participant):
 
     try:
         course = Course.objects.get(pk=course_id)
+        if re.search(r"\bweb2\b", (course.name or "").lower()):
+            return
         name = participant.get("name")
         email = participant.get("email")
         number = participant.get("number")

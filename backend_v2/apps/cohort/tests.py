@@ -47,7 +47,6 @@ class RegistrationEmailTemplateTests(SimpleTestCase):
     def test_non_zk_templates_render_activation_url_when_present(self):
         activation_url = "https://portal.example.com/activate?token=abc"
         template_names = [
-            "cohort/web2_registration_email.html",
             "cohort/web3_registration_email.html",
             "cohort/rust_registration_email.html",
             "other_registration_email.html",
@@ -63,9 +62,19 @@ class RegistrationEmailTemplateTests(SimpleTestCase):
                 self.assertIn("Activate your student portal account", rendered)
                 self.assertIn(activation_url, rendered)
 
+    def test_web2_welcome_templates_are_static_no_portal_activation_block(self):
+        for template_name in (
+            "cohort/web2_launchpad_registration_email.html",
+            "cohort/web2_advanced_frontend_registration_email.html",
+            "cohort/web2_advanced_backend_registration_email.html",
+        ):
+            with self.subTest(template_name=template_name):
+                rendered = render_to_string(template_name, {})
+                self.assertIn("Hi there,", rendered)
+                self.assertNotIn("Activate your student portal account", rendered)
+
     def test_non_zk_templates_hide_activation_url_when_missing(self):
         template_names = [
-            "cohort/web2_registration_email.html",
             "cohort/web3_registration_email.html",
             "cohort/rust_registration_email.html",
             "other_registration_email.html",
