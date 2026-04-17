@@ -691,6 +691,7 @@ class ParticipantViewSet(GuestReadAllWriteAdminOnlyPermissionMixin, viewsets.Vie
         email = serializer.validated_data["email"]
         score = serializer.validated_data["score"]
         passed = serializer.validated_data["passed"]
+        breakdown = serializer.validated_data.get("breakdown")
 
         # Find participant by email
         participant = models.Participant.objects.filter(email=email).first()
@@ -718,6 +719,7 @@ class ParticipantViewSet(GuestReadAllWriteAdminOnlyPermissionMixin, viewsets.Vie
         models.Assessment.objects.create(
             participant=participant,
             score=score,
+            breakdown=breakdown,
             passed=passed,
             date_taken=timezone.now(),
         )
@@ -725,9 +727,13 @@ class ParticipantViewSet(GuestReadAllWriteAdminOnlyPermissionMixin, viewsets.Vie
         # Send appropriate email
         payment_link = "https://payment.web3bridgeafrica.com"
         if passed:
-            send_assessment_passed_email(email, participant.name, participant.cohort, score, payment_link)
+            send_assessment_passed_email(
+                email, participant.name, participant.cohort, score, payment_link, breakdown=breakdown
+            )
         else:
-            send_assessment_failed_email(email, participant.name, participant.cohort, score)
+            send_assessment_failed_email(
+                email, participant.name, participant.cohort, score, breakdown=breakdown
+            )
 
         return requestUtils.success_response(
             data={"message": f"Assessment submitted and email sent to {email}"},

@@ -220,7 +220,11 @@ class ParticipantSerializer:
         city = serializers.CharField(required=True)
         state = serializers.CharField(required=False, allow_blank=True, default="")
         country = serializers.CharField(required=True)
-        gender = serializers.CharField(required=True)
+        # Stored on Participant.gender (max_length=20). Collected on the public registration form (frontend_v2).
+        gender = serializers.CharField(
+            required=True,
+            help_text="Required for new registrations; values such as male, female, or other from the registration UI.",
+        )
         github = serializers.URLField(required=False)
         number = serializers.CharField(required=False, allow_blank=True, default="")
         venue = serializers.CharField(required=True)
@@ -369,6 +373,7 @@ class SubmitAssessmentSerializer(serializers.Serializer):
     email = serializers.EmailField()
     score = serializers.DecimalField(max_digits=5, decimal_places=2)
     passed = serializers.BooleanField()
+    breakdown = serializers.JSONField(required=False, allow_null=True)
 
 
 # Testimonial Serializer

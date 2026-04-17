@@ -128,4 +128,7 @@ export const unifiedRegistrationSchema = z.object({
   country: z.string({ required_error: "Please select your country" }).min(1),
   state: z.string({ required_error: "Please select your state" }).min(1),
   venue: z.string({ required_error: "Please select a venue" }).optional(),
+  gender: z.enum(["male", "female", "other"], {
+    required_error: "Please select your gender.",
+  }),
 });

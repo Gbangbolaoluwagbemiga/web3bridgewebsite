@@ -12,6 +12,7 @@
         a { color: #007bff; text-decoration: none; }
         a:hover { text-decoration: underline; }
         .footer { margin-top: 30px; font-size: 13px; color: #666; }
+        .breakdown { background: #f1f3f5; padding: 12px 16px; border-radius: 6px; font-size: 14px; white-space: pre-wrap; font-family: ui-monospace, Consolas, monospace; line-height: 1.5; }
     </style>
 </head>
 <body>
@@ -21,6 +22,11 @@
         <p>Thank you for taking the Web3Bridge assessment for <strong>{{ cohort }}</strong>. We truly appreciate the effort and time you put into it.</p>
 
         <div class="score">{{ score }} / 100</div>
+
+        {% if breakdown_display %}
+        <p><strong>Score breakdown</strong></p>
+        <div class="breakdown">{{ breakdown_display }}</div>
+        {% endif %}
 
         <p>Unfortunately, your score did not meet the passing mark for this cohort. We know this is not the news you were hoping for, and we understand how disappointing it can feel.</p>
 
