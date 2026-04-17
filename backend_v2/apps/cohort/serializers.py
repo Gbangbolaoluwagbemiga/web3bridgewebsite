@@ -365,12 +365,28 @@ class EmailSerializer(serializers.Serializer):
 class RescheduleAssessmentSerializer(serializers.Serializer):
     email = serializers.EmailField()
     name = serializers.CharField(max_length=255)
-    cohort = serializers.CharField(max_length=255)
+    cohort = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        max_length=255,
+        help_text=(
+            "Optional. Cohort is taken from the latest participant row for this email "
+            "(by registration time), not from this field."
+        ),
+    )
     assessment_link = serializers.URLField()
 
 
 class SubmitAssessmentSerializer(serializers.Serializer):
     email = serializers.EmailField()
+    participant_id = serializers.IntegerField(
+        required=False,
+        allow_null=True,
+        help_text=(
+            "Optional. When set, must match the participant row and the email must match that "
+            "participant. Use when multiple registrations share an email."
+        ),
+    )
     score = serializers.DecimalField(max_digits=5, decimal_places=2)
     passed = serializers.BooleanField()
     breakdown = serializers.JSONField(required=False, allow_null=True)

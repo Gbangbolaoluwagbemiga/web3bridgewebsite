@@ -254,7 +254,7 @@ class RegistrationEmailTemplateTests(SimpleTestCase):
 class RescheduleAssessmentEndpointTests(TestCase):
     """
     Tests for POST /api/v2/cohort/participant/reschedule/
-    No DB needed — the endpoint only validates input and sends an email.
+    Resolves the latest Participant row for the email (by created_at).
     Email sending is mocked so no real SMTP calls are made.
     """
 
@@ -269,6 +269,35 @@ class RescheduleAssessmentEndpointTests(TestCase):
 
     def setUp(self):
         self.client = APIClient()
+        from cohort.models import Registration, Course, Participant
+
+        self.registration = Registration.objects.create(
+            name="Web3 Cohort XIV", cohort="Cohort-XIV", is_open=True
+        )
+        self.course = Course.objects.create(
+            name="Web3 Development",
+            description="Learn Web3",
+            extra_info="Extra",
+            registration=self.registration,
+        )
+        self.participant = Participant.objects.create(
+            name="John Doe",
+            email="student@example.com",
+            wallet_address="0x123",
+            registration=self.registration,
+            course=self.course,
+            cohort="Web3 Cohort XIV",
+            venue="online",
+        )
+        self.other_participant = Participant.objects.create(
+            name="Jane Roe",
+            email="other@example.com",
+            wallet_address="0x456",
+            registration=self.registration,
+            course=self.course,
+            cohort="Web3 Cohort XIV",
+            venue="online",
+        )
 
     @patch("cohort.views.send_reschedule_assessment_email")
     def test_valid_request_returns_200_and_sends_email(self, mock_send):
@@ -307,13 +336,18 @@ class RescheduleAssessmentEndpointTests(TestCase):
         mock_send.assert_not_called()
 
     @patch("cohort.views.send_reschedule_assessment_email")
-    def test_missing_cohort_returns_400(self, mock_send):
+    def test_cohort_field_optional_latest_participant_used(self, mock_send):
         payload = {**self.VALID_PAYLOAD}
         payload.pop("cohort")
         response = self.client.post(self.ENDPOINT, payload, format="json")
 
-        self.assertEqual(response.status_code, 400)
-        mock_send.assert_not_called()
+        self.assertEqual(response.status_code, 200)
+        mock_send.assert_called_once_with(
+            "student@example.com",
+            "John Doe",
+            "Web3 Cohort XIV",
+            "https://calendly.com/web3bridge/assessment",
+        )
 
     @patch("cohort.views.send_reschedule_assessment_email")
     def test_missing_assessment_link_returns_400(self, mock_send):
@@ -359,11 +393,110 @@ class RescheduleAssessmentEndpointTests(TestCase):
         self.client.post(self.ENDPOINT, self.VALID_PAYLOAD, format="json")
 
         # Different participant — should be allowed
-        different_payload = {**self.VALID_PAYLOAD, "email": "other@example.com"}
+        different_payload = {
+            **self.VALID_PAYLOAD,
+            "email": "other@example.com",
+            "name": "Jane Roe",
+        }
         response = self.client.post(self.ENDPOINT, different_payload, format="json")
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(mock_send.call_count, 2)
+
+    @patch("cohort.views.send_reschedule_assessment_email")
+    def test_reschedule_without_matching_participant_returns_404(self, mock_send):
+        payload = {
+            **self.VALID_PAYLOAD,
+            "email": "unknown@example.com",
+        }
+        response = self.client.post(self.ENDPOINT, payload, format="json")
+        self.assertEqual(response.status_code, 404)
+        mock_send.assert_not_called()
+
+    @patch("cohort.views.send_reschedule_assessment_email")
+    def test_reschedule_allowed_again_after_delete_and_re_register(self, mock_send):
+        """Deleting a participant clears CASCADE reschedule; same email can reschedule on new row."""
+        from cohort.models import AssessmentReschedule, Participant
+
+        self.client.post(self.ENDPOINT, self.VALID_PAYLOAD, format="json")
+        self.assertTrue(
+            AssessmentReschedule.objects.filter(participant=self.participant).exists()
+        )
+
+        self.participant.delete()
+
+        Participant.objects.create(
+            name="John Doe",
+            email="student@example.com",
+            wallet_address="0x999",
+            registration=self.registration,
+            course=self.course,
+            cohort="Web3 Cohort XIV",
+            venue="online",
+        )
+
+        response = self.client.post(self.ENDPOINT, self.VALID_PAYLOAD, format="json")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(mock_send.call_count, 2)
+
+    @patch("cohort.views.send_reschedule_assessment_email")
+    def test_latest_participant_wins_when_same_email_two_registrations(self, mock_send):
+        """Stale cohort in payload must not bind to an older row; latest created_at wins."""
+        from cohort.models import AssessmentReschedule, Course, Participant, Registration
+
+        reg_old = Registration.objects.create(
+            name="Old Cohort", cohort="Cohort-XIII", is_open=True
+        )
+        course_old = Course.objects.create(
+            name="Old Course",
+            description="Old",
+            extra_info="Extra",
+            registration=reg_old,
+        )
+        Participant.objects.create(
+            name="John Doe",
+            email="student@example.com",
+            wallet_address="0xold",
+            registration=reg_old,
+            course=course_old,
+            cohort="Old Cohort Label",
+            venue="online",
+        )
+
+        reg_new = Registration.objects.create(
+            name="Web3 Cohort XV", cohort="Cohort-XV", is_open=True
+        )
+        course_new = Course.objects.create(
+            name="Solidity",
+            description="S",
+            extra_info="Extra",
+            registration=reg_new,
+        )
+        newer = Participant.objects.create(
+            name="John Doe",
+            email="student@example.com",
+            wallet_address="0xnew",
+            registration=reg_new,
+            course=course_new,
+            cohort="Web3 Cohort XV",
+            venue="online",
+        )
+
+        payload = {
+            **self.VALID_PAYLOAD,
+            "cohort": "Old Cohort Label",
+        }
+        response = self.client.post(self.ENDPOINT, payload, format="json")
+        self.assertEqual(response.status_code, 200)
+        mock_send.assert_called_once_with(
+            "student@example.com",
+            "John Doe",
+            "Web3 Cohort XV",
+            "https://calendly.com/web3bridge/assessment",
+        )
+        self.assertTrue(
+            AssessmentReschedule.objects.filter(participant=newer).exists()
+        )
 
 
 class RescheduleAssessmentTemplateTests(SimpleTestCase):
@@ -522,6 +655,63 @@ class SubmitAssessmentEndpointTests(TestCase):
 
         self.assertEqual(response.status_code, 400)
         mock_passed.assert_not_called()
+
+    @patch("cohort.views.send_assessment_passed_email")
+    def test_participant_id_email_mismatch_returns_400(self, mock_passed):
+        payload = {
+            "email": "wrong@example.com",
+            "participant_id": self.participant.id,
+            "score": "85.50",
+            "passed": True,
+        }
+        response = self._post(payload)
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("mismatch", response.json()["message"].lower())
+        mock_passed.assert_not_called()
+
+    @patch("cohort.views.send_assessment_passed_email")
+    def test_participant_id_targets_specific_row_when_email_duplicated(self, mock_passed):
+        """Same email on two registrations: optional participant_id picks the row explicitly."""
+        from cohort.models import Assessment, Course, Participant, Registration
+
+        reg2 = Registration.objects.create(
+            name="ZK Cohort XV", cohort="Cohort-XV", is_open=True
+        )
+        course2 = Course.objects.create(
+            name="ZK Track",
+            description="ZK",
+            extra_info="Extra",
+            registration=reg2,
+        )
+        newer = Participant.objects.create(
+            name="John Doe",
+            email="john@example.com",
+            wallet_address="0xbbb",
+            registration=reg2,
+            course=course2,
+            cohort="Cohort-XV",
+            venue="online",
+        )
+
+        # No participant_id: latest by created_at is `newer`
+        r1 = self._post(
+            {"email": "john@example.com", "score": "90.00", "passed": True}
+        )
+        self.assertEqual(r1.status_code, 201)
+        self.assertTrue(Assessment.objects.filter(participant=newer).exists())
+
+        # Explicit older participant (self.participant)
+        r2 = self._post(
+            {
+                "email": "john@example.com",
+                "participant_id": self.participant.id,
+                "score": "55.00",
+                "passed": True,
+            }
+        )
+        self.assertEqual(r2.status_code, 201)
+        a_old = Assessment.objects.get(participant=self.participant)
+        self.assertEqual(str(a_old.score), "55.00")
 
 
 class PaymentActivationEmailTests(SimpleTestCase):

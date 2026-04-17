@@ -639,6 +639,10 @@ class ParticipantViewSet(GuestReadAllWriteAdminOnlyPermissionMixin, viewsets.Vie
         """
         Notify a student that their assessment has been rescheduled.
         Sends an email with a CTA button linking to the new assessment and a 3-day deadline notice.
+
+        The participant is resolved as the **latest** row for the given email (newest
+        ``created_at``), so re-registrations and multiple cohort rows do not bind to an
+        older registration. Cohort in the email and stored record comes from that row.
         """
         serializer = serializers.RescheduleAssessmentSerializer(data=request.data)
         if not serializer.is_valid():
@@ -650,18 +654,36 @@ class ParticipantViewSet(GuestReadAllWriteAdminOnlyPermissionMixin, viewsets.Vie
 
         email = serializer.validated_data["email"]
         name = serializer.validated_data["name"]
-        cohort = serializer.validated_data["cohort"]
         assessment_link = serializer.validated_data["assessment_link"]
 
-        if models.AssessmentReschedule.objects.filter(email=email).exists():
+        # Latest registration for this email (same person may appear in multiple cohort rows).
+        participant = (
+            models.Participant.objects.filter(email__iexact=email)
+            .order_by("-created_at", "-id")
+            .first()
+        )
+        if not participant:
+            return requestUtils.error_response(
+                "Participant not found",
+                {
+                    "detail": "No participant found with this email. They must be registered first.",
+                },
+                http_status=status.HTTP_404_NOT_FOUND,
+            )
+
+        cohort_label = participant.cohort
+
+        if models.AssessmentReschedule.objects.filter(participant=participant).exists():
             return requestUtils.error_response(
                 "Assessment already rescheduled",
                 {"detail": "This participant has already rescheduled their assessment once. No further reschedules are allowed."},
                 http_status=status.HTTP_400_BAD_REQUEST,
             )
 
-        send_reschedule_assessment_email(email, name, cohort, assessment_link)
-        models.AssessmentReschedule.objects.create(email=email, cohort=cohort)
+        send_reschedule_assessment_email(email, name, cohort_label, assessment_link)
+        models.AssessmentReschedule.objects.create(
+            participant=participant, email=email, cohort=cohort_label
+        )
 
         return requestUtils.success_response(
             data={"message": f"Reschedule assessment email sent to {email}"},
@@ -675,6 +697,10 @@ class ParticipantViewSet(GuestReadAllWriteAdminOnlyPermissionMixin, viewsets.Vie
         Submit an assessment result for a participant.
         Creates an Assessment record and sends a pass or fail email.
         Requires a valid API-Key header.
+
+        If the same email exists on multiple participant rows, pass optional
+        ``participant_id`` to target the correct registration; otherwise the
+        most recently created participant with that email is used.
         """
         if not self.check_api_key(request):
             return Response(
@@ -692,15 +718,38 @@ class ParticipantViewSet(GuestReadAllWriteAdminOnlyPermissionMixin, viewsets.Vie
         score = serializer.validated_data["score"]
         passed = serializer.validated_data["passed"]
         breakdown = serializer.validated_data.get("breakdown")
+        participant_id = serializer.validated_data.get("participant_id")
 
-        # Find participant by email
-        participant = models.Participant.objects.filter(email=email).first()
-        if not participant:
-            return requestUtils.error_response(
-                "Participant not found",
-                {"detail": "No participant found with this email. Please register first."},
-                http_status=status.HTTP_404_NOT_FOUND,
+        if participant_id is not None:
+            participant = models.Participant.objects.filter(pk=participant_id).first()
+            if not participant:
+                return requestUtils.error_response(
+                    "Participant not found",
+                    {"detail": f"No participant with id={participant_id}."},
+                    http_status=status.HTTP_404_NOT_FOUND,
+                )
+            if participant.email.strip().lower() != email.strip().lower():
+                return requestUtils.error_response(
+                    "Participant email mismatch",
+                    {
+                        "detail": "participant_id does not match the given email for this participant.",
+                    },
+                    http_status=status.HTTP_400_BAD_REQUEST,
+                )
+        else:
+            # Prefer the latest registration if the same email exists on multiple participants
+            # (e.g. different cohorts / re-registration after deletion).
+            participant = (
+                models.Participant.objects.filter(email__iexact=email)
+                .order_by("-created_at")
+                .first()
             )
+            if not participant:
+                return requestUtils.error_response(
+                    "Participant not found",
+                    {"detail": "No participant found with this email. Please register first."},
+                    http_status=status.HTTP_404_NOT_FOUND,
+                )
 
         # Block duplicate assessment for the same cohort
         already_exists = models.Assessment.objects.filter(
@@ -777,6 +826,9 @@ class ParticipantViewSet(GuestReadAllWriteAdminOnlyPermissionMixin, viewsets.Vie
         # Nullify the DB-level FK in payment table before deleting.
         # payment.registration_id references cohort_participant.id but is not
         # managed by Django, so raw SQL is required to preserve payment records.
+        #
+        # Participant deletion CASCADE-removes related Assessment and AssessmentReschedule
+        # (and other FKs with CASCADE). Payment rows are kept with registration_id nulled.
         from django.db import connection
         with connection.cursor() as cursor:
             cursor.execute(
