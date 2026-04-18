@@ -229,6 +229,8 @@ EMAIL_HOST_USER = config("EMAIL_HOST_USER")
 EMAIL_HOST_PASSWORD = config("EMAIL_HOST_PASSWORD")
 EMAIL_USE_TLS = config("EMAIL_USE_TLS", default=True, cast=bool)
 DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL")
+# Comma-separated. When set, portal onboarding invite final failures email these addresses.
+OPERATIONS_ALERT_EMAILS = config("OPERATIONS_ALERT_EMAILS", default="", cast=Csv())
 
 # Admission email settings (optional - will fall back to main email settings if not set)
 ADMISSION_EMAIL_HOST = config("ADMISSION_EMAIL_HOST", default=EMAIL_HOST)

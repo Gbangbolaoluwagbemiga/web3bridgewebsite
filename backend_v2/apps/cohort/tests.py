@@ -6,6 +6,7 @@ from django.template.loader import render_to_string
 from django.urls import reverse
 from rest_framework.test import APIClient
 
+from cohort import views as cohort_views
 from .helpers.portal import (
     create_portal_onboarding_invite,
     is_zk_course_name,
@@ -34,6 +35,118 @@ class VerifyPaymentSerializerTests(SimpleTestCase):
 
         s = VerifyPaymentByEmailSerializer(data={"email": "user@example.com"})
         self.assertTrue(s.is_valid(), s.errors)
+
+
+@override_settings(
+    SECURE_SSL_REDIRECT=False,
+    PORTAL_ONBOARDING_URL="",
+    PORTAL_INTERNAL_API_KEY="",
+)
+class VerifyPaymentAndConfirmationPaymentStatusTests(TestCase):
+    """
+    Payment portal must mark the correct Participant row paid when one email has
+    multiple registrations; send-confirmation must set payment_status as well.
+    """
+
+    VERIFY_URL = "/api/v2/cohort/participant/verify-payment-by-email/"
+    API_KEY = "test-verify-payment-key"
+
+    def setUp(self):
+        self.client = APIClient()
+        from cohort.models import Course, Participant, Registration
+
+        self.reg_old = Registration.objects.create(
+            name="Web3 Cohort XIV", cohort="Cohort-XIV", is_open=True
+        )
+        self.reg_new = Registration.objects.create(
+            name="Web3 Cohort XV", cohort="Cohort-XV", is_open=True
+        )
+        self.course_old = Course.objects.create(
+            name="Web3 Cohort XIV Course",
+            description="Desc",
+            extra_info="Extra",
+            registration=self.reg_old,
+        )
+        self.course_new = Course.objects.create(
+            name="Web3 Cohort XV Course",
+            description="Desc",
+            extra_info="Extra",
+            registration=self.reg_new,
+        )
+        # Older row: still unpaid (the one the user paid for)
+        self.participant_unpaid = Participant.objects.create(
+            name="Jane",
+            email="dup@example.com",
+            wallet_address="0xaaa",
+            registration=self.reg_old,
+            course=self.course_old,
+            cohort="Cohort-XIV",
+            venue="online",
+            payment_status=False,
+        )
+        # Newer row: already paid (e.g. another cohort) — email-only verify must not target this
+        self.participant_paid_newer = Participant.objects.create(
+            name="Jane",
+            email="dup@example.com",
+            wallet_address="0xaaa",
+            registration=self.reg_new,
+            course=self.course_new,
+            cohort="Cohort-XV",
+            venue="online",
+            payment_status=True,
+        )
+
+    def _verify_post(self, payload):
+        return self.client.post(
+            self.VERIFY_URL,
+            payload,
+            format="json",
+            headers={"API-Key": self.API_KEY},
+        )
+
+    @patch.object(cohort_views, "API_KEY", "test-verify-payment-key")
+    @patch("cohort.views.handle_payment_success")
+    def test_verify_payment_targets_unpaid_row_when_newer_paid_exists(
+        self, mock_handle_success
+    ):
+        mock_handle_success.side_effect = (
+            lambda participant, serialized, serializer_class: serializer_class.Retrieve(
+                participant
+            ).data
+        )
+
+        response = self._verify_post({"email": "dup@example.com"})
+
+        self.assertEqual(response.status_code, 200)
+        self.participant_unpaid.refresh_from_db()
+        self.assertTrue(self.participant_unpaid.payment_status)
+        self.participant_paid_newer.refresh_from_db()
+        self.assertTrue(self.participant_paid_newer.payment_status)
+        mock_handle_success.assert_called_once()
+
+    @patch.object(cohort_views, "API_KEY", "test-verify-payment-key")
+    def test_verify_payment_respects_status_false(self):
+        self.participant_unpaid.payment_status = False
+        self.participant_unpaid.save()
+
+        response = self._verify_post(
+            {"email": "dup@example.com", "status": False}
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.participant_unpaid.refresh_from_db()
+        self.assertFalse(self.participant_unpaid.payment_status)
+
+    @patch.object(cohort_views, "API_KEY", "test-verify-payment-key")
+    @patch("cohort.views.handle_payment_success")
+    def test_verify_payment_idempotent_when_already_paid(self, mock_handle):
+        self.participant_unpaid.payment_status = True
+        self.participant_unpaid.save()
+
+        response = self._verify_post({"email": "dup@example.com"})
+
+        self.assertEqual(response.status_code, 200)
+        mock_handle.assert_not_called()
 
 
 class PortalInviteHelperTests(SimpleTestCase):
@@ -243,6 +356,38 @@ class RegistrationEmailTemplateTests(SimpleTestCase):
         activation_url = create_portal_onboarding_invite(participant)
 
         self.assertIsNone(activation_url)
+
+    @patch("apps.cohort.helpers.portal.send_mail")
+    @patch("apps.cohort.helpers.portal.requests.post")
+    @override_settings(
+        PORTAL_ONBOARDING_URL="http://localhost:8000/api/v1/onboarding/invite",
+        PORTAL_INTERNAL_API_KEY="secret-key",
+        PORTAL_REQUEST_TIMEOUT=5,
+        OPERATIONS_ALERT_EMAILS=["ops@example.com"],
+        DEFAULT_FROM_EMAIL="noreply@example.com",
+    )
+    def test_create_portal_onboarding_invite_emails_ops_on_final_failure(
+        self, mock_post, mock_send_mail
+    ):
+        mock_post.side_effect = requests.RequestException("network failure")
+
+        participant = Mock(
+            id=44,
+            email="student@example.com",
+            cohort="Cohort-XIV",
+            status="accepted",
+            course=Mock(),
+        )
+        participant.name = "Student Example"
+        participant.course.name = "Web3 Cohort XIV"
+
+        activation_url = create_portal_onboarding_invite(participant)
+
+        self.assertIsNone(activation_url)
+        mock_send_mail.assert_called_once()
+        kwargs = mock_send_mail.call_args[1]
+        self.assertEqual(kwargs["recipient_list"], ["ops@example.com"])
+        self.assertIn("Participant ID: 44", kwargs["message"])
 
     @patch("apps.cohort.helpers.portal.requests.post")
     @override_settings(
@@ -787,9 +932,8 @@ class SubmitAssessmentEndpointTests(TestCase):
 
 class PaymentActivationEmailTests(SimpleTestCase):
     """
-    Verify that after a successful payment, the portal activation URL
-    is fetched and passed into the registration success email for non-ZK students.
-    ZK students must NOT receive the activation URL.
+    ``send_registration_success_mail`` may include an activation URL when passed explicitly.
+    ``handle_payment_success`` sends only one mail, with no portal activation URL.
     """
 
     @patch("cohort.helpers.model.base.render_to_string")
@@ -844,14 +988,10 @@ class PaymentActivationEmailTests(SimpleTestCase):
         self.assertEqual(context.get("name"), "ZK Student")
 
     @patch("cohort.views.send_registration_success_mail")
-    @patch("cohort.views.create_portal_onboarding_invite")
-    def test_handle_payment_success_calls_portal_invite(
-        self, mock_invite, mock_mail
+    def test_handle_payment_success_sends_one_mail_without_portal_activation(
+        self, mock_mail
     ):
         from cohort.views import handle_payment_success
-        from unittest.mock import MagicMock
-
-        mock_invite.return_value = "https://portal.web3bridge.com/activate/onboard?token=xyz"
 
         participant = MagicMock()
         participant.course_id = 1
@@ -864,12 +1004,11 @@ class PaymentActivationEmailTests(SimpleTestCase):
 
         handle_payment_success(participant, serialized, serializer_class)
 
-        # Portal invite must be called with the participant object
-        mock_invite.assert_called_once_with(participant)
-        # Mail must be called with the activation_url
         mock_mail.assert_called_once_with(
-            "student@example.com", 1, "John Doe",
-            activation_url="https://portal.web3bridge.com/activate/onboard?token=xyz"
+            "student@example.com",
+            1,
+            "John Doe",
+            activation_url=None,
         )
 
 

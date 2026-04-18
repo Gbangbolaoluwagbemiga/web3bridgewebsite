@@ -362,6 +362,22 @@ class EmailSerializer(serializers.Serializer):
     email = serializers.EmailField()
 
 
+class SendConfirmationEmailSerializer(serializers.Serializer):
+    """Resend confirmation: optional disambiguators when one email has multiple registrations."""
+
+    email = serializers.EmailField()
+    participantId = serializers.IntegerField(
+        required=False,
+        allow_null=True,
+        help_text="Participant primary key (preferred when provided by the client).",
+    )
+    course = serializers.IntegerField(
+        required=False,
+        allow_null=True,
+        help_text="Course id for the registration to confirm (alternative to participantId).",
+    )
+
+
 class VerifyPaymentByEmailSerializer(serializers.Serializer):
     """Payload from payment service when marking a participant paid on the main server."""
 
@@ -373,6 +389,16 @@ class VerifyPaymentByEmailSerializer(serializers.Serializer):
         help_text="Opaque payment reference from the payment backend (stored for tracing only).",
     )
     status = serializers.BooleanField(required=False, default=True)
+    participantId = serializers.IntegerField(
+        required=False,
+        allow_null=True,
+        help_text="Disambiguate when the email has multiple cohort registrations.",
+    )
+    course = serializers.IntegerField(
+        required=False,
+        allow_null=True,
+        help_text="Course id for this payment (alternative to participantId).",
+    )
 
 
 class RescheduleAssessmentSerializer(serializers.Serializer):

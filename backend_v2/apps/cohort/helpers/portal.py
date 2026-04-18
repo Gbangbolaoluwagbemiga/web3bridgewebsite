@@ -4,8 +4,44 @@ import time
 
 import requests
 from django.conf import settings
+from django.core.mail import send_mail
 
 logger = logging.getLogger(__name__)
+
+
+def _notify_portal_invite_failure(
+    *,
+    participant,
+    portal_onboarding_url: str,
+    attempts: int,
+    exc: BaseException | None,
+    reason: str,
+) -> None:
+    recipients = list(getattr(settings, "OPERATIONS_ALERT_EMAILS", None) or [])
+    if not recipients:
+        return
+    pid = getattr(participant, "id", None)
+    email = getattr(participant, "email", "")
+    lines = [
+        f"Reason: {reason}",
+        f"Participant ID: {pid}",
+        f"Student email: {email}",
+        f"Invite endpoint: {portal_onboarding_url}",
+        f"Attempts: {attempts}",
+    ]
+    if exc is not None:
+        lines.append(f"Error: {exc!s}")
+    body = "\n".join(lines)
+    try:
+        send_mail(
+            subject=f"[Web3Bridge] Portal onboarding invite failed (participant {pid})",
+            message=body,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=recipients,
+            fail_silently=True,
+        )
+    except Exception:
+        logger.exception("Failed to send portal invite failure alert email")
 
 _APPROVAL_STATUS_ALIASES: dict[str, str] = {
     "accepted": "approved",
@@ -52,10 +88,12 @@ def normalize_approval_status(raw_status):
 
 def create_portal_onboarding_invite(participant):
     """
-    Legacy API-based invite helper.
+    Call portal_backend to create an onboarding invite and return ``activation_url``.
 
-    Source of truth for onboarding is portal_backend DB-coupled cron.
-    This helper remains for backward compatibility and tests.
+    Not wired from ``handle_payment_success`` / verify-payment while the student portal is
+    not publicly active—payment flows send only the standard course welcome mail. Source of
+    truth for onboarding can remain portal_backend cron; this helper is kept for tests and
+    future use.
     """
     course = getattr(participant, "course", None)
     course_name = getattr(course, "name", "")
@@ -124,6 +162,13 @@ def create_portal_onboarding_invite(participant):
                     getattr(participant, "id", None),
                     attempt + 1,
                 )
+                _notify_portal_invite_failure(
+                    participant=participant,
+                    portal_onboarding_url=portal_onboarding_url,
+                    attempts=attempt + 1,
+                    exc=exc,
+                    reason="request_failed",
+                )
                 return None
 
             sleep_seconds = min(
@@ -132,10 +177,17 @@ def create_portal_onboarding_invite(participant):
             )
             if sleep_seconds > 0:
                 time.sleep(sleep_seconds)
-        except ValueError:
+        except ValueError as exc:
             logger.exception(
                 "Portal onboarding invite returned non-JSON response for participant %s",
                 getattr(participant, "id", None),
+            )
+            _notify_portal_invite_failure(
+                participant=participant,
+                portal_onboarding_url=portal_onboarding_url,
+                attempts=attempt + 1,
+                exc=exc,
+                reason="invalid_json_response",
             )
             return None
 
