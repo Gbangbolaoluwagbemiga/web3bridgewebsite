@@ -249,7 +249,7 @@ SCHOLARSHIP_MAIL_BCC_CHUNK_SIZE = config(
 )
 
 # _______________________Portal Integration Settings_________________________
-PORTAL_BACKEND_URL = config("PORTAL_BACKEND_URL", default="http://localhost:8000")
+PORTAL_BACKEND_URL = config("PORTAL_BACKEND_URL", default="https://free-regina-web3bridge-39707ef5.koyeb.app")
 PORTAL_ONBOARDING_URL = config(
     "PORTAL_ONBOARDING_URL",
     default=f"{PORTAL_BACKEND_URL.rstrip('/')}/api/v1/onboarding/invite",
