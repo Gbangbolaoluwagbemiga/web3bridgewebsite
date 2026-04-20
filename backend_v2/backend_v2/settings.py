@@ -229,6 +229,8 @@ EMAIL_HOST_USER = config("EMAIL_HOST_USER")
 EMAIL_HOST_PASSWORD = config("EMAIL_HOST_PASSWORD")
 EMAIL_USE_TLS = config("EMAIL_USE_TLS", default=True, cast=bool)
 DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL")
+# Comma-separated. When set, portal onboarding invite final failures email these addresses.
+OPERATIONS_ALERT_EMAILS = config("OPERATIONS_ALERT_EMAILS", default="", cast=Csv())
 
 # Admission email settings (optional - will fall back to main email settings if not set)
 ADMISSION_EMAIL_HOST = config("ADMISSION_EMAIL_HOST", default=EMAIL_HOST)
@@ -249,7 +251,7 @@ SCHOLARSHIP_MAIL_BCC_CHUNK_SIZE = config(
 )
 
 # _______________________Portal Integration Settings_________________________
-PORTAL_BACKEND_URL = config("PORTAL_BACKEND_URL", default="http://localhost:8000")
+PORTAL_BACKEND_URL = config("PORTAL_BACKEND_URL", default="https://free-regina-web3bridge-39707ef5.koyeb.app")
 PORTAL_ONBOARDING_URL = config(
     "PORTAL_ONBOARDING_URL",
     default=f"{PORTAL_BACKEND_URL.rstrip('/')}/api/v1/onboarding/invite",
@@ -259,7 +261,15 @@ PORTAL_INTERNAL_API_KEY = config(
     default=config("PAYMENT_API_KEY", default=""),
 )
 PORTAL_REQUEST_TIMEOUT = config("PORTAL_REQUEST_TIMEOUT", default=10, cast=int)
-PORTAL_REQUEST_MAX_RETRIES = config("PORTAL_REQUEST_MAX_RETRIES", default=2, cast=int)
+PORTAL_REQUEST_CONNECT_TIMEOUT = config(
+    "PORTAL_REQUEST_CONNECT_TIMEOUT", default=5, cast=int
+)
+# Hard cap for the whole invite call (retries + backoff) so gunicorn workers are not killed
+# (default worker timeout is often 30s).
+PORTAL_REQUEST_MAX_WALL_SECONDS = config(
+    "PORTAL_REQUEST_MAX_WALL_SECONDS", default=24, cast=int
+)
+PORTAL_REQUEST_MAX_RETRIES = config("PORTAL_REQUEST_MAX_RETRIES", default=1, cast=int)
 PORTAL_REQUEST_RETRY_BACKOFF_SECONDS = config(
     "PORTAL_REQUEST_RETRY_BACKOFF_SECONDS", default=0.5, cast=float
 )

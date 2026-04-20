@@ -195,14 +195,29 @@ class ApprovedWeb3Participant(BaseModelBaseMixin, models.Model):
 
 
 class AssessmentReschedule(models.Model):
-    """Tracks reschedule requests. A participant may only reschedule once."""
-    email = models.EmailField(_('email'), max_length=255, unique=True)
-    cohort = models.CharField(_('cohort'), max_length=255)
+    """
+    Tracks reschedule requests: at most one per Participant row.
+    Tied to Participant (CASCADE) so deleting a participant clears reschedule state;
+    re-registration with the same email gets a new Participant and may reschedule again.
+    """
+    participant = models.OneToOneField(
+        Participant,
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name="assessment_reschedule",
+    )
+    email = models.EmailField(
+        _("email"),
+        max_length=255,
+        help_text="Denormalized copy of participant email for reporting.",
+    )
+    cohort = models.CharField(_("cohort"), max_length=255)
     rescheduled_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         indexes = [
-            models.Index(fields=['email'], name='reschedule_email_idx'),
+            models.Index(fields=["email"], name="reschedule_email_idx"),
         ]
 
     def __str__(self):

@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registration confirmed – Web3Bridge</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f8f9fa;
+            color: #333;
+            margin: 0;
+            padding: 0;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #fff;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            color: #007bff;
+            font-size: 1.25rem;
+        }
+
+        p {
+            line-height: 1.6;
+            margin-bottom: 15px;
+        }
+
+        a {
+            color: #007bff;
+            text-decoration: none;
+        }
+
+        a:hover {
+            text-decoration: underline;
+        }
+
+        .notice {
+            font-size: 0.95rem;
+            color: #555;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>Registration confirmed</h1>
+        <p>Hi {{ name }},</p>
+        <p>Thank you for registering for <strong>{{ course_name }}</strong> with Web3Bridge. Your registration has been
+            received.</p>
+        <p>Your <strong>student portal</strong> is where you’ll find onboarding steps, schedules, materials, and
+            important updates. Please use it as your main place to stay on track.</p>
+        {% if activation_url %}
+        <p><a href="{{ activation_url }}">Open your student portal</a></p>
+        {% else %}
+        <p class="notice">If you don’t have portal access yet, watch your inbox—we’ll send onboarding details when your
+            access is ready.</p>
+        {% endif %}
+        <p>Stay connected: <a href="https://discord.gg/zjq3fUDBsV">Discord</a> · <a
+                href="https://t.me/web3bridge">Telegram</a> · <a href="https://x.com/Web3Bridge">X (Twitter)</a></p>
+        <p>For questions, reach us at <a href="mailto:admission@web3bridge.com">admission@web3bridge.com</a>.</p>
+        <p>Warm regards,<br>The Web3Bridge Team<br><a href="https://www.web3bridge.com"
+                target="_blank" rel="noopener">www.web3bridge.com</a></p>
+    </div>
+</body>
+
+</html>

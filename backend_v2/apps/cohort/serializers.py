@@ -362,15 +362,70 @@ class EmailSerializer(serializers.Serializer):
     email = serializers.EmailField()
 
 
+class SendConfirmationEmailSerializer(serializers.Serializer):
+    """Resend confirmation: optional disambiguators when one email has multiple registrations."""
+
+    email = serializers.EmailField()
+    participantId = serializers.IntegerField(
+        required=False,
+        allow_null=True,
+        help_text="Participant primary key (preferred when provided by the client).",
+    )
+    course = serializers.IntegerField(
+        required=False,
+        allow_null=True,
+        help_text="Course id for the registration to confirm (alternative to participantId).",
+    )
+
+
+class VerifyPaymentByEmailSerializer(serializers.Serializer):
+    """Payload from payment service when marking a participant paid on the main server."""
+
+    email = serializers.EmailField()
+    paymentId = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        max_length=255,
+        help_text="Opaque payment reference from the payment backend (stored for tracing only).",
+    )
+    status = serializers.BooleanField(required=False, default=True)
+    participantId = serializers.IntegerField(
+        required=False,
+        allow_null=True,
+        help_text="Disambiguate when the email has multiple cohort registrations.",
+    )
+    course = serializers.IntegerField(
+        required=False,
+        allow_null=True,
+        help_text="Course id for this payment (alternative to participantId).",
+    )
+
+
 class RescheduleAssessmentSerializer(serializers.Serializer):
     email = serializers.EmailField()
     name = serializers.CharField(max_length=255)
-    cohort = serializers.CharField(max_length=255)
+    cohort = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        max_length=255,
+        help_text=(
+            "Optional. Cohort is taken from the latest participant row for this email "
+            "(by registration time), not from this field."
+        ),
+    )
     assessment_link = serializers.URLField()
 
 
 class SubmitAssessmentSerializer(serializers.Serializer):
     email = serializers.EmailField()
+    participant_id = serializers.IntegerField(
+        required=False,
+        allow_null=True,
+        help_text=(
+            "Optional. When set, must match the participant row and the email must match that "
+            "participant. Use when multiple registrations share an email."
+        ),
+    )
     score = serializers.DecimalField(max_digits=5, decimal_places=2)
     passed = serializers.BooleanField()
     breakdown = serializers.JSONField(required=False, allow_null=True)

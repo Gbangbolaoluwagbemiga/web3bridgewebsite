@@ -17,11 +17,9 @@ from .helpers.model import (
     send_approval_email,
     send_assessment_failed_email,
     send_assessment_passed_email,
-    send_participant_details,
     send_registration_success_mail,
     send_reschedule_assessment_email,
 )
-from .helpers.portal import create_portal_onboarding_invite
 from backend_v2.scripts.mail import send_bulk_email
 from payment.models import DiscountCode, Payment
 from utils.enums.models import RegistrationStatus
@@ -47,21 +45,76 @@ def invalidate_participant_cache():
         pass
 
 
+def resolve_participant_for_payment_email(
+    base_queryset,
+    *,
+    email: str,
+    participant_id: int | None = None,
+    course_id: int | None = None,
+):
+    """
+    Resolve which Participant row to mark paid or resend confirmation for.
+
+    Using ``.filter(email=...).first()`` on a newest-first queryset updates the
+    wrong row when an older registration is still unpaid. Prefer ``participantId``
+    or ``course`` from the payment service when present; otherwise prefer the
+    newest unpaid row, then the newest row overall.
+    """
+    email = (email or "").strip()
+    if not email:
+        return None
+    qs = base_queryset.filter(email__iexact=email)
+    if participant_id is not None:
+        return qs.filter(pk=participant_id).first()
+    if course_id is not None:
+        return qs.filter(course_id=course_id).first()
+    unpaid = (
+        qs.filter(payment_status=False)
+        .order_by("-created_at", "-id")
+        .first()
+    )
+    if unpaid is not None:
+        return unpaid
+    return qs.order_by("-created_at", "-id").first()
+
+
 API_KEY = config("PAYMENT_API_KEY")
 
 
 def handle_payment_success(
     participant_object, serialized_participant_obj, serializer_class
 ):
+    """
+    Send one standard registration success email after payment.
+
+    Portal activation emails are not sent here: the student portal is not live yet, and
+    course templates already explain portal access timelines (e.g. within 14 days).
+    """
     email = serialized_participant_obj.get("email")
     participant_name = serialized_participant_obj.get("name")
-    course_id = serialized_participant_obj.get("course").get("id")
+    course_id = getattr(participant_object, "course_id", None)
+    course_data = serialized_participant_obj.get("course")
+    if course_id is None and isinstance(course_data, dict):
+        course_id = course_data.get("id")
+    if not course_id:
+        logger.warning(
+            "Payment flow for %s: participant id=%s has no course; skipping welcome email",
+            email,
+            getattr(participant_object, "id", None),
+        )
+        return serializer_class.Retrieve(participant_object).data
 
-    # Get portal activation URL for non-ZK students
-    activation_url = create_portal_onboarding_invite(participant_object)
+    try:
+        send_registration_success_mail(
+            email, course_id, participant_name, activation_url=None
+        )
+    except Exception:
+        logger.exception(
+            "send_registration_success_mail failed for %s (course_id=%s)",
+            email,
+            course_id,
+        )
 
-    send_registration_success_mail(email, course_id, participant_name, activation_url=activation_url)
-    send_participant_details(email, course_id, serialized_participant_obj)
     return serializer_class.Retrieve(participant_object).data
 
 
@@ -460,7 +513,7 @@ class ParticipantViewSet(GuestReadAllWriteAdminOnlyPermissionMixin, viewsets.Vie
             http_status=status.HTTP_400_BAD_REQUEST,
         )
 
-    @swagger_auto_schema(request_body=serializers.EmailSerializer)
+    @swagger_auto_schema(request_body=serializers.VerifyPaymentByEmailSerializer)
     @decorators.action(
         detail=False, methods=["post"], url_path="verify-payment-by-email"
     )
@@ -470,13 +523,24 @@ class ParticipantViewSet(GuestReadAllWriteAdminOnlyPermissionMixin, viewsets.Vie
                 {"error": "Invalid or missing API key"},
                 status=status.HTTP_401_UNAUTHORIZED,
             )
-        email = request.data.get("email")
-        if not email:
+        body = serializers.VerifyPaymentByEmailSerializer(data=request.data)
+        if not body.is_valid():
             return requestUtils.error_response(
-                "Email is required", {}, http_status=status.HTTP_400_BAD_REQUEST
+                "Invalid request",
+                body.errors,
+                http_status=status.HTTP_400_BAD_REQUEST,
             )
+        email = body.validated_data["email"]
+        participant_id = body.validated_data.get("participantId")
+        course_id = body.validated_data.get("course")
+        mark_paid = body.validated_data.get("status", True)
 
-        participant_object = self.get_queryset().filter(email=email).first()
+        participant_object = resolve_participant_for_payment_email(
+            self.get_queryset(),
+            email=email,
+            participant_id=participant_id,
+            course_id=course_id,
+        )
         if not participant_object:
             return requestUtils.error_response(
                 "Participant not found", {}, http_status=status.HTTP_404_NOT_FOUND
@@ -485,6 +549,16 @@ class ParticipantViewSet(GuestReadAllWriteAdminOnlyPermissionMixin, viewsets.Vie
         serialized_participant_obj = self.serializer_class.Retrieve(
             participant_object
         ).data
+        if not mark_paid:
+            return requestUtils.success_response(
+                data=serialized_participant_obj, http_status=status.HTTP_200_OK
+            )
+
+        if participant_object.payment_status:
+            return requestUtils.success_response(
+                data=serialized_participant_obj, http_status=status.HTTP_200_OK
+            )
+
         participant_object.payment_status = True
         participant_object.save()
         # Invalidate cache when payment status changes
@@ -553,19 +627,34 @@ class ParticipantViewSet(GuestReadAllWriteAdminOnlyPermissionMixin, viewsets.Vie
                 "Course not found", {}, http_status=status.HTTP_404_NOT_FOUND
             )
 
-    @swagger_auto_schema(request_body=serializers.EmailSerializer)
+    @swagger_auto_schema(request_body=serializers.SendConfirmationEmailSerializer)
     @decorators.action(
         detail=False, methods=["post"], url_path="send-confirmation-email"
     )
     def send_confirmation_email(self, request, *args, **kwargs):
-        """Resend registration confirmation emails. Does NOT change payment status."""
-        email = request.data.get("email")
-        if not email:
-            return requestUtils.error_response(
-                "Email is required", {}, http_status=status.HTTP_400_BAD_REQUEST
-            )
+        """
+        Mark the participant paid (if not already) and resend the standard course welcome email.
 
-        participant_object = self.get_queryset().filter(email=email).first()
+        Same single welcome email as after payment: no portal activation link (templates already
+        describe portal timing where applicable).
+        """
+        body = serializers.SendConfirmationEmailSerializer(data=request.data)
+        if not body.is_valid():
+            return requestUtils.error_response(
+                "Invalid request",
+                body.errors,
+                http_status=status.HTTP_400_BAD_REQUEST,
+            )
+        email = body.validated_data["email"]
+        participant_id = body.validated_data.get("participantId")
+        course_id = body.validated_data.get("course")
+
+        participant_object = resolve_participant_for_payment_email(
+            self.get_queryset(),
+            email=email,
+            participant_id=participant_id,
+            course_id=course_id,
+        )
         if not participant_object:
             return requestUtils.error_response(
                 "Participant not found", {}, http_status=status.HTTP_404_NOT_FOUND
@@ -574,12 +663,32 @@ class ParticipantViewSet(GuestReadAllWriteAdminOnlyPermissionMixin, viewsets.Vie
         serialized_participant_obj = self.serializer_class.Retrieve(
             participant_object
         ).data
-        course_id = serialized_participant_obj.get("course", {}).get("id")
+        if not participant_object.payment_status:
+            participant_object.payment_status = True
+            participant_object.save()
+            invalidate_participant_cache()
+
+        course_data = serialized_participant_obj.get("course") or {}
+        resolved_course_id = course_data.get("id") or participant_object.course_id
         participant_name = serialized_participant_obj.get("name")
 
-        send_registration_success_mail(email, course_id, participant_name)
-        send_participant_details(email, course_id, serialized_participant_obj)
+        try:
+            send_registration_success_mail(
+                participant_object.email,
+                resolved_course_id,
+                participant_name,
+                activation_url=None,
+            )
+        except Exception:
+            logger.exception(
+                "send_registration_success_mail failed for confirmation resend (email=%s course_id=%s)",
+                participant_object.email,
+                resolved_course_id,
+            )
 
+        serialized_participant_obj = self.serializer_class.Retrieve(
+            participant_object
+        ).data
         return requestUtils.success_response(
             data=serialized_participant_obj, http_status=status.HTTP_200_OK
         )
@@ -639,6 +748,10 @@ class ParticipantViewSet(GuestReadAllWriteAdminOnlyPermissionMixin, viewsets.Vie
         """
         Notify a student that their assessment has been rescheduled.
         Sends an email with a CTA button linking to the new assessment and a 3-day deadline notice.
+
+        The participant is resolved as the **latest** row for the given email (newest
+        ``created_at``), so re-registrations and multiple cohort rows do not bind to an
+        older registration. Cohort in the email and stored record comes from that row.
         """
         serializer = serializers.RescheduleAssessmentSerializer(data=request.data)
         if not serializer.is_valid():
@@ -650,18 +763,36 @@ class ParticipantViewSet(GuestReadAllWriteAdminOnlyPermissionMixin, viewsets.Vie
 
         email = serializer.validated_data["email"]
         name = serializer.validated_data["name"]
-        cohort = serializer.validated_data["cohort"]
         assessment_link = serializer.validated_data["assessment_link"]
 
-        if models.AssessmentReschedule.objects.filter(email=email).exists():
+        # Latest registration for this email (same person may appear in multiple cohort rows).
+        participant = (
+            models.Participant.objects.filter(email__iexact=email)
+            .order_by("-created_at", "-id")
+            .first()
+        )
+        if not participant:
+            return requestUtils.error_response(
+                "Participant not found",
+                {
+                    "detail": "No participant found with this email. They must be registered first.",
+                },
+                http_status=status.HTTP_404_NOT_FOUND,
+            )
+
+        cohort_label = participant.cohort
+
+        if models.AssessmentReschedule.objects.filter(participant=participant).exists():
             return requestUtils.error_response(
                 "Assessment already rescheduled",
                 {"detail": "This participant has already rescheduled their assessment once. No further reschedules are allowed."},
                 http_status=status.HTTP_400_BAD_REQUEST,
             )
 
-        send_reschedule_assessment_email(email, name, cohort, assessment_link)
-        models.AssessmentReschedule.objects.create(email=email, cohort=cohort)
+        send_reschedule_assessment_email(email, name, cohort_label, assessment_link)
+        models.AssessmentReschedule.objects.create(
+            participant=participant, email=email, cohort=cohort_label
+        )
 
         return requestUtils.success_response(
             data={"message": f"Reschedule assessment email sent to {email}"},
@@ -675,6 +806,10 @@ class ParticipantViewSet(GuestReadAllWriteAdminOnlyPermissionMixin, viewsets.Vie
         Submit an assessment result for a participant.
         Creates an Assessment record and sends a pass or fail email.
         Requires a valid API-Key header.
+
+        If the same email exists on multiple participant rows, pass optional
+        ``participant_id`` to target the correct registration; otherwise the
+        most recently created participant with that email is used.
         """
         if not self.check_api_key(request):
             return Response(
@@ -692,15 +827,38 @@ class ParticipantViewSet(GuestReadAllWriteAdminOnlyPermissionMixin, viewsets.Vie
         score = serializer.validated_data["score"]
         passed = serializer.validated_data["passed"]
         breakdown = serializer.validated_data.get("breakdown")
+        participant_id = serializer.validated_data.get("participant_id")
 
-        # Find participant by email
-        participant = models.Participant.objects.filter(email=email).first()
-        if not participant:
-            return requestUtils.error_response(
-                "Participant not found",
-                {"detail": "No participant found with this email. Please register first."},
-                http_status=status.HTTP_404_NOT_FOUND,
+        if participant_id is not None:
+            participant = models.Participant.objects.filter(pk=participant_id).first()
+            if not participant:
+                return requestUtils.error_response(
+                    "Participant not found",
+                    {"detail": f"No participant with id={participant_id}."},
+                    http_status=status.HTTP_404_NOT_FOUND,
+                )
+            if participant.email.strip().lower() != email.strip().lower():
+                return requestUtils.error_response(
+                    "Participant email mismatch",
+                    {
+                        "detail": "participant_id does not match the given email for this participant.",
+                    },
+                    http_status=status.HTTP_400_BAD_REQUEST,
+                )
+        else:
+            # Prefer the latest registration if the same email exists on multiple participants
+            # (e.g. different cohorts / re-registration after deletion).
+            participant = (
+                models.Participant.objects.filter(email__iexact=email)
+                .order_by("-created_at")
+                .first()
             )
+            if not participant:
+                return requestUtils.error_response(
+                    "Participant not found",
+                    {"detail": "No participant found with this email. Please register first."},
+                    http_status=status.HTTP_404_NOT_FOUND,
+                )
 
         # Block duplicate assessment for the same cohort
         already_exists = models.Assessment.objects.filter(
@@ -777,6 +935,9 @@ class ParticipantViewSet(GuestReadAllWriteAdminOnlyPermissionMixin, viewsets.Vie
         # Nullify the DB-level FK in payment table before deleting.
         # payment.registration_id references cohort_participant.id but is not
         # managed by Django, so raw SQL is required to preserve payment records.
+        #
+        # Participant deletion CASCADE-removes related Assessment and AssessmentReschedule
+        # (and other FKs with CASCADE). Payment rows are kept with registration_id nulled.
         from django.db import connection
         with connection.cursor() as cursor:
             cursor.execute(
